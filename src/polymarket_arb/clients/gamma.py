@@ -13,9 +13,18 @@ class GammaClient:
         self._client = client or httpx.Client(base_url=base_url, timeout=10.0)
 
     def fetch_market_by_slug(self, slug: str) -> dict[str, Any]:
-        response = self._client.get(f"/markets/slug/{slug}")
+        response = self._client.get("/markets", params={"slug": slug})
         response.raise_for_status()
-        return response.json()
+        payload = response.json()
+        if not payload:
+            raise LookupError(f"No Gamma market found for slug '{slug}'")
+        return payload[0]
 
     def fetch_markets_by_slugs(self, slugs: list[str]) -> list[dict[str, Any]]:
-        return [self.fetch_market_by_slug(slug) for slug in slugs]
+        markets: list[dict[str, Any]] = []
+        for slug in slugs:
+            try:
+                markets.append(self.fetch_market_by_slug(slug))
+            except LookupError:
+                continue
+        return markets

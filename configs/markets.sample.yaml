@@ -5,7 +5,7 @@ api:
   poll_interval_ms: 500
   catalog_output_path: artifacts/catalog.json
 markets:
-  - slug: will-btc-be-above-100k
+  - slug: bitboy-convicted
     max_capital_usd: 50
 strategy:
   raw_alert_threshold: 0.99
