@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from polymarket_arb.domain.models import MarketCatalogEntry
+from polymarket_arb.research.opportunities import OpportunityResearchReport
 
 
 def write_run_summary(output_dir: Path, summary: Dict[str, Any]) -> Path:
@@ -19,3 +20,15 @@ def write_catalog_snapshot(output_path: Path, catalog: list[MarketCatalogEntry])
         encoding="utf-8",
     )
     return output_path
+
+
+def write_opportunity_summary(
+    output_dir: Path, report: OpportunityResearchReport
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "opportunity_summary.json"
+    summary_path.write_text(
+        json.dumps(report.model_dump(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return summary_path

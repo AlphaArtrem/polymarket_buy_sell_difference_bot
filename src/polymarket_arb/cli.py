@@ -13,7 +13,12 @@ from polymarket_arb.domain.models import MarketCatalogEntry
 from polymarket_arb.engine import TradingEngine
 from polymarket_arb.recording.storage import JsonlEventStore, ReplayInputError
 from polymarket_arb.adapters.replay import ReplayAdapter
-from polymarket_arb.reporting.writers import write_catalog_snapshot, write_run_summary
+from polymarket_arb.reporting.writers import (
+    write_catalog_snapshot,
+    write_opportunity_summary,
+    write_run_summary,
+)
+from polymarket_arb.research.opportunities import analyze_recorded_opportunities
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -126,6 +131,31 @@ def run_paper(
     engine = TradingEngine.from_settings(settings, catalog)
     summary = engine.run(adapter.iter_events(limit_seconds=duration_seconds))
     write_run_summary(output_dir, summary)
+
+
+@app.command("analyze-recording")
+def analyze_recording(
+    config_path: Path = typer.Option(..., "--config-path"),
+    run_dir: Path = typer.Option(..., "--run-dir"),
+    output_dir: Path = typer.Option(..., "--output-dir"),
+) -> None:
+    """Analyze recorded order books for full-set opportunity frequency."""
+    settings = load_settings(config_path)
+    store = JsonlEventStore(run_dir)
+    try:
+        store.validate_replay_inputs()
+    except ReplayInputError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    report = analyze_recorded_opportunities(
+        catalog=store.read_catalog(required=True),
+        events=list(store.iter_events(required=True)),
+        stale_after_ms=settings.strategy.stale_after_ms,
+        fee_rate=settings.strategy.fee_rate,
+        slippage_buffer=settings.strategy.slippage_buffer,
+        operational_buffer=settings.strategy.operational_buffer,
+    )
+    write_opportunity_summary(output_dir, report)
 
 
 if __name__ == "__main__":

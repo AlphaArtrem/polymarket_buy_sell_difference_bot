@@ -12,4 +12,6 @@ PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli catalog-refresh --config-p
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli record-live --config-path configs/markets.sample.yaml --run-dir artifacts/live-capture --duration-seconds 10
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli run-paper --config-path configs/markets.sample.yaml --output-dir artifacts/paper-report --duration-seconds 10
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli run-replay --config-path configs/markets.sample.yaml --run-dir artifacts/demo-run --output-dir artifacts/demo-report
+PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli record-live --config-path configs/markets.research.yaml --run-dir artifacts/research-live --duration-seconds 1800
+PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli analyze-recording --config-path configs/markets.research.yaml --run-dir artifacts/research-live --output-dir artifacts/research-report
 ```
