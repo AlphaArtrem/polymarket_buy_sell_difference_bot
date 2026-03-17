@@ -20,25 +20,37 @@ def test_analyzer_counts_raw_and_post_cost_opportunities() -> None:
         OrderBookEvent(
             market_id="m1",
             side="YES",
-            asks=[BookLevel(price=0.48, size=100.0)],
+            asks=[
+                BookLevel(price=0.99, size=10.0),
+                BookLevel(price=0.48, size=100.0),
+            ],
             timestamp_ms=1_000,
         ),
         OrderBookEvent(
             market_id="m1",
             side="NO",
-            asks=[BookLevel(price=0.49, size=100.0)],
+            asks=[
+                BookLevel(price=0.99, size=10.0),
+                BookLevel(price=0.49, size=100.0),
+            ],
             timestamp_ms=1_000,
         ),
         OrderBookEvent(
             market_id="m1",
             side="YES",
-            asks=[BookLevel(price=0.52, size=100.0)],
+            asks=[
+                BookLevel(price=0.99, size=10.0),
+                BookLevel(price=0.52, size=100.0),
+            ],
             timestamp_ms=2_000,
         ),
         OrderBookEvent(
             market_id="m1",
             side="NO",
-            asks=[BookLevel(price=0.50, size=100.0)],
+            asks=[
+                BookLevel(price=0.99, size=10.0),
+                BookLevel(price=0.50, size=100.0),
+            ],
             timestamp_ms=2_000,
         ),
     ]

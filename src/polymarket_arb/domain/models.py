@@ -44,9 +44,8 @@ class OrderBookSnapshot(BaseModel):
             return int(parsed.timestamp() * 1000)
         raise TypeError("Unsupported timestamp format")
 
-    @field_validator("asks", "bids", mode="before")
     @classmethod
-    def parse_levels(cls, value: object) -> list[BookLevel]:
+    def _parse_levels(cls, value: object) -> list[BookLevel]:
         if value is None:
             return []
         levels: list[BookLevel] = []
@@ -62,6 +61,18 @@ class OrderBookSnapshot(BaseModel):
             price, size = raw_level
             levels.append(BookLevel(price=float(price), size=float(size)))
         return levels
+
+    @field_validator("asks", mode="before")
+    @classmethod
+    def parse_asks(cls, value: object) -> list[BookLevel]:
+        return sorted(cls._parse_levels(value), key=lambda level: level.price)
+
+    @field_validator("bids", mode="before")
+    @classmethod
+    def parse_bids(cls, value: object) -> list[BookLevel]:
+        return sorted(
+            cls._parse_levels(value), key=lambda level: level.price, reverse=True
+        )
 
 
 class Opportunity(BaseModel):
