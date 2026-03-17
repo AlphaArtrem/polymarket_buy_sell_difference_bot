@@ -1,0 +1,25 @@
+{
+  "market": "0xabc",
+  "asset_id": "yes-token-abc",
+  "timestamp": "1700000000000",
+  "hash": "book-hash-yes",
+  "bids": [
+    {
+      "price": "0.42",
+      "size": "12"
+    }
+  ],
+  "asks": [
+    {
+      "price": "0.43",
+      "size": "10"
+    },
+    {
+      "price": "0.44",
+      "size": "25"
+    }
+  ],
+  "min_order_size": "5",
+  "tick_size": "0.01",
+  "neg_risk": false
+}

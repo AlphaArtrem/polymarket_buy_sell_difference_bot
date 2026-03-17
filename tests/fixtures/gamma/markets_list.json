@@ -1,0 +1,22 @@
+[
+  {
+    "id": "0xabc",
+    "slug": "will-btc-be-above-100k",
+    "question": "Will BTC be above $100k?",
+    "active": true,
+    "closed": false,
+    "outcomes": ["Yes", "No"],
+    "clobTokenIds": ["yes-token-abc", "no-token-abc"],
+    "feesEnabled": true
+  },
+  {
+    "id": "0xdef",
+    "slug": "multi-outcome-market",
+    "question": "Which candidate wins?",
+    "active": true,
+    "closed": false,
+    "outcomes": ["A", "B", "C"],
+    "clobTokenIds": ["a", "b", "c"],
+    "feesEnabled": false
+  }
+]

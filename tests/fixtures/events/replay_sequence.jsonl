@@ -1,0 +1,2 @@
+{"market_id":"market-1","side":"YES","asks":[{"price":0.43,"size":10.0}],"timestamp_ms":1000}
+{"market_id":"market-1","side":"NO","asks":[{"price":0.54,"size":10.0}],"timestamp_ms":1001}

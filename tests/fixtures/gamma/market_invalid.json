@@ -1,0 +1,9 @@
+{
+  "id": "market-2",
+  "slug": "multi-outcome-market",
+  "active": true,
+  "closed": false,
+  "outcomes": ["A", "B", "C"],
+  "clobTokenIds": ["a", "b", "c"],
+  "feesEnabled": false
+}

@@ -1,0 +1,25 @@
+{
+  "market": "0xabc",
+  "asset_id": "no-token-abc",
+  "timestamp": "1700000000001",
+  "hash": "book-hash-no",
+  "bids": [
+    {
+      "price": "0.53",
+      "size": "14"
+    }
+  ],
+  "asks": [
+    {
+      "price": "0.54",
+      "size": "10"
+    },
+    {
+      "price": "0.55",
+      "size": "25"
+    }
+  ],
+  "min_order_size": "5",
+  "tick_size": "0.01",
+  "neg_risk": false
+}

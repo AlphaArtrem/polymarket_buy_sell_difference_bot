@@ -1,0 +1,10 @@
+{
+  "id": "market-1",
+  "slug": "will-btc-be-above-100k",
+  "question": "Will BTC be above $100k on July 1?",
+  "active": true,
+  "closed": false,
+  "outcomes": ["Yes", "No"],
+  "clobTokenIds": ["yes-token", "no-token"],
+  "feesEnabled": true
+}
