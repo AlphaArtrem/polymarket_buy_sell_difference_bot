@@ -1,0 +1,6 @@
+{
+  "event_type": "book",
+  "asset_id": "yes-token-1",
+  "asks": [["0.41", "5"], ["0.42", "10"]],
+  "timestamp": 1700000000002
+}

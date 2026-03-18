@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 class ApiSettings(BaseModel):
     gamma_base_url: str
     clob_base_url: str
+    market_ws_url: str = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
     poll_interval_ms: int = Field(gt=0)
     catalog_output_path: str | None = None
 
@@ -30,12 +31,19 @@ class PortfolioSettings(BaseModel):
     max_total_deployed_usd: float = Field(gt=0)
 
 
+class RuntimeSettings(BaseModel):
+    mode: str = "poll"
+    artifact_dir: str = "artifacts/runtime"
+    polygon_rpc_url: str | None = None
+
+
 class Settings(BaseModel):
     venue: str
     api: ApiSettings
     markets: List[MarketSelection]
     strategy: StrategySettings
     portfolio: PortfolioSettings
+    runtime: RuntimeSettings = RuntimeSettings()
 
 
 def load_settings(path: Path) -> Settings:

@@ -1,0 +1,15 @@
+[Unit]
+Description=Polymarket paper trader
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/polymarket-bot
+EnvironmentFile=/srv/polymarket-bot/ops/env/polymarket-paper.env
+ExecStart=/srv/polymarket-bot/.venv/bin/python -m polymarket_arb.cli run-paper --config-path ${POLYMARKET_CONFIG_PATH} --output-dir /srv/polymarket-bot/artifacts/paper-report --duration-seconds 60 --mode stream
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

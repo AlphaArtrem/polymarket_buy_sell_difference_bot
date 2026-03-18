@@ -2,8 +2,13 @@ venue: polymarket
 api:
   gamma_base_url: https://gamma-api.polymarket.com
   clob_base_url: https://clob.polymarket.com
+  market_ws_url: wss://ws-subscriptions-clob.polymarket.com/ws/market
   poll_interval_ms: 500
   catalog_output_path: artifacts/catalog.json
+runtime:
+  mode: stream
+  artifact_dir: artifacts/runtime
+  polygon_rpc_url: https://polygon-rpc.example
 markets:
   - slug: bitboy-convicted
     max_capital_usd: 50
