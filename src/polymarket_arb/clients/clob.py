@@ -1,8 +1,11 @@
+import json
 from typing import Any, AsyncIterator
 
 import httpx
 import websockets
+from pydantic import BaseModel, Field
 
+from polymarket_arb.domain.models import BookLevel
 from polymarket_arb.domain.models import OrderBookSnapshot
 
 
@@ -11,6 +14,21 @@ class ClobWebSocketClient:
         async with websockets.connect(url) as websocket:
             async for message in websocket:
                 yield message
+
+    async def subscribe_market(
+        self, url: str, asset_ids: list[str]
+    ) -> AsyncIterator[str]:
+        async with websockets.connect(url) as websocket:
+            await websocket.send(json.dumps(build_market_subscription(asset_ids)))
+            async for message in websocket:
+                yield message
+
+
+class ClobMarketStreamMessage(BaseModel):
+    event_type: str
+    asset_id: str | None = None
+    asks: list[BookLevel] = Field(default_factory=list)
+    timestamp_ms: int | None = None
 
 
 class ClobClient:
@@ -44,4 +62,31 @@ def normalize_order_books_payload(payload: Any) -> dict[str, OrderBookSnapshot]:
     return {snapshot.asset_id: snapshot for snapshot in snapshots}
 
 
-__all__ = ["ClobClient", "ClobWebSocketClient", "OrderBookSnapshot"]
+def normalize_market_ws_message(payload: dict[str, Any]) -> ClobMarketStreamMessage:
+    asks = payload.get("asks", [])
+    return ClobMarketStreamMessage(
+        event_type=str(payload.get("event_type", payload.get("type", "unknown"))),
+        asset_id=(
+            str(payload["asset_id"])
+            if payload.get("asset_id") is not None
+            else None
+        ),
+        asks=[BookLevel(price=float(price), size=float(size)) for price, size in asks],
+        timestamp_ms=(
+            int(payload["timestamp"]) if payload.get("timestamp") is not None else None
+        ),
+    )
+
+
+def build_market_subscription(asset_ids: list[str]) -> dict[str, Any]:
+    return {"asset_ids": asset_ids, "type": "market"}
+
+
+__all__ = [
+    "ClobClient",
+    "ClobMarketStreamMessage",
+    "ClobWebSocketClient",
+    "OrderBookSnapshot",
+    "build_market_subscription",
+    "normalize_market_ws_message",
+]

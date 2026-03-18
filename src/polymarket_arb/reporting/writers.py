@@ -19,3 +19,15 @@ def write_catalog_snapshot(output_path: Path, catalog: list[MarketCatalogEntry])
         encoding="utf-8",
     )
     return output_path
+
+
+def write_latency_summary(output_path: Path, payload: Dict[str, Any]) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return output_path
+
+
+def write_feed_health(output_path: Path, payload: Dict[str, Any]) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return output_path
