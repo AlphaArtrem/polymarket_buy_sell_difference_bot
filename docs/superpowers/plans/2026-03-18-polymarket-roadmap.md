@@ -25,6 +25,9 @@ Current code still does not:
 
 - log detailed opportunity and rejection artifacts
 - model inventory lots and lifecycle honestly enough for serious evaluation
+- benchmark endpoint or region latency
+- support VPS deployment assets or remote runtime guidance
+- ingest public market data through a WebSocket-first live path
 - handle long-running live sessions robustly
 - support market research sweeps over many runs and parameter sets
 - authenticate and place real orders
@@ -32,17 +35,19 @@ Current code still does not:
 
 ## Remaining Phase Order
 
-1. [Phase 3: Execution Accounting And Research Artifacts](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase3-execution-accounting.md)
-2. [Phase 4: Streaming Recorder And Live Ops Hardening](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase4-streaming-recorder-ops.md)
-3. [Phase 5: Research Sweeps And Market Selection](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase5-research-sweeps.md)
-4. [Phase 6: Authenticated Execution And Safety Rails](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase6-authenticated-execution.md)
-5. [Phase 7: Live Rollout And Runtime Operations](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase7-live-rollout-ops.md)
+1. [Phase 2.1: VPS And Low-Latency Market Data](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase2-1-vps-websocket-latency.md)
+2. [Phase 3: Execution Accounting And Research Artifacts](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase3-execution-accounting.md)
+3. [Phase 4: Streaming Recorder And Live Ops Hardening](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase4-streaming-recorder-ops.md)
+4. [Phase 5: Research Sweeps And Market Selection](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase5-research-sweeps.md)
+5. [Phase 6: Authenticated Execution And Safety Rails](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase6-authenticated-execution.md)
+6. [Phase 7: Live Rollout And Runtime Operations](/Users/alphaartrem/Desktop/workspace/trading_bot/docs/superpowers/plans/2026-03-18-polymarket-phase7-live-rollout-ops.md)
 
 ## Dependency Notes
 
-- Phase 3 should happen before any serious replay research, because the current summary is too thin to trust.
-- Phase 4 should happen before long live sessions, because the current live adapter is polling-only and not resilient enough for operational use.
-- Phase 5 depends on Phase 3 artifacts and benefits from Phase 4 capture quality.
+- Phase 2.1 should happen before any serious live evaluation, because the current live adapter is polling-only and cannot tell us whether missed opportunities are strategy failures or latency failures.
+- Phase 3 should happen before broad replay research, because the current summary is too thin to trust.
+- Phase 4 builds on Phase 2.1 by hardening reconnect, metadata, and long-running stream behavior after the first-cut VPS streaming path exists.
+- Phase 5 depends on Phase 3 artifacts and benefits from Phase 2.1 and Phase 4 capture quality.
 - Phase 6 should start only after Phase 3 and Phase 5 show a repeatable edge worth trading.
 - Phase 7 should start only after Phase 6 is implemented and manually tested with tiny size.
 
