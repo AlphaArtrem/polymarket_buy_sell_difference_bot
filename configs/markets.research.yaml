@@ -1,0 +1,36 @@
+venue: polymarket
+api:
+  gamma_base_url: https://gamma-api.polymarket.com
+  clob_base_url: https://clob.polymarket.com
+  poll_interval_ms: 500
+  catalog_output_path: artifacts/catalog.research.json
+markets:
+  - slug: will-poland-qualify-for-the-2026-fifa-world-cup
+    max_capital_usd: 25
+  - slug: will-harvey-weinstein-be-sentenced-to-less-than-5-years-in-prison
+    max_capital_usd: 25
+  - slug: will-openai-launch-a-new-consumer-hardware-product-by-march-31-2026
+    max_capital_usd: 25
+  - slug: will-sweden-qualify-for-the-2026-fifa-world-cup
+    max_capital_usd: 25
+  - slug: will-megaeth-perform-an-airdrop-by-june-30-143-229-513-574-212-254
+    max_capital_usd: 25
+  - slug: new-playboi-carti-album-before-gta-vi-421
+    max_capital_usd: 25
+  - slug: new-rhianna-album-before-gta-vi-926
+    max_capital_usd: 25
+  - slug: russia-ukraine-ceasefire-before-gta-vi-554
+    max_capital_usd: 25
+  - slug: will-the-edmonton-oilers-win-the-2026-nhl-stanley-cup
+    max_capital_usd: 25
+  - slug: trump-out-as-president-before-gta-vi-846
+    max_capital_usd: 25
+strategy:
+  raw_alert_threshold: 0.99
+  fee_rate: 0.01
+  slippage_buffer: 0.005
+  operational_buffer: 0.005
+  stale_after_ms: 5000
+portfolio:
+  starting_cash_usd: 1000
+  max_total_deployed_usd: 250
