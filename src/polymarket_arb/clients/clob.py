@@ -64,8 +64,11 @@ def normalize_order_books_payload(payload: Any) -> dict[str, OrderBookSnapshot]:
 
 def normalize_market_ws_message(payload: dict[str, Any]) -> ClobMarketStreamMessage:
     asks = payload.get("asks", [])
+    event_type = payload.get("event_type", payload.get("type"))
+    if event_type is None and payload.get("asset_id") is not None and "asks" in payload:
+        event_type = "book"
     return ClobMarketStreamMessage(
-        event_type=str(payload.get("event_type", payload.get("type", "unknown"))),
+        event_type=str(event_type or "unknown"),
         asset_id=(
             str(payload["asset_id"])
             if payload.get("asset_id") is not None

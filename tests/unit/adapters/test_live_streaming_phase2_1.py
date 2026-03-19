@@ -44,7 +44,7 @@ def test_live_adapter_bootstraps_books_then_emits_stream_updates() -> None:
         async def subscribe_market(self, url: str, asset_ids: list[str]):
             assert url.endswith("/ws/market")
             assert asset_ids == ["yes-token-1", "no-token-abc"]
-            yield json.dumps(ws_message)
+            yield json.dumps([ws_message])
 
     adapter = LiveAdapter(
         catalog=catalog,

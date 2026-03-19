@@ -171,28 +171,36 @@ class LiveAdapter:
                 break
 
             self._feed_health["stream_messages_seen"] += 1
-            event = self._normalize_stream_message(raw_message)
-            if event is not None:
-                events.append(event)
+            events.extend(self._normalize_stream_messages(raw_message))
         return events
 
-    def _normalize_stream_message(self, raw_message: str | dict[str, Any]) -> OrderBookEvent | None:
+    def _normalize_stream_messages(
+        self, raw_message: str | dict[str, Any] | list[dict[str, Any]]
+    ) -> list[OrderBookEvent]:
         payload = (
             json.loads(raw_message)
             if isinstance(raw_message, str)
             else raw_message
         )
-        message = normalize_market_ws_message(payload)
-        if message.event_type != "book" or message.asset_id is None:
-            return None
-        if message.asset_id not in self._asset_index or message.timestamp_ms is None:
-            return None
-        market_id, side = self._asset_index[message.asset_id]
-        return stream_message_to_event(
-            message=message,
-            market_id=market_id,
-            side=side,
-        )
+        messages = payload if isinstance(payload, list) else [payload]
+        events: list[OrderBookEvent] = []
+        for raw_payload in messages:
+            if not isinstance(raw_payload, dict):
+                continue
+            message = normalize_market_ws_message(raw_payload)
+            if message.event_type != "book" or message.asset_id is None:
+                continue
+            if message.asset_id not in self._asset_index or message.timestamp_ms is None:
+                continue
+            market_id, side = self._asset_index[message.asset_id]
+            events.append(
+                stream_message_to_event(
+                    message=message,
+                    market_id=market_id,
+                    side=side,
+                )
+            )
+        return events
 
 
 def snapshot_to_event(

@@ -80,20 +80,22 @@ def test_run_paper_streaming_mode_writes_summary_and_feed_health(
         async def subscribe_market(self, url: str, asset_ids: list[str]):
             assert asset_ids == ["yes-token-abc", "no-token-abc"]
             yield json.dumps(
-                {
-                    "event_type": "book",
-                    "asset_id": "yes-token-abc",
-                    "asks": [["0.43", "10"]],
-                    "timestamp": 1_700_000_000_010,
-                }
-            )
-            yield json.dumps(
-                {
-                    "event_type": "book",
-                    "asset_id": "no-token-abc",
-                    "asks": [["0.54", "10"]],
-                    "timestamp": 1_700_000_000_011,
-                }
+                [
+                    {
+                        "market": "0xabc",
+                        "asset_id": "yes-token-abc",
+                        "asks": [["0.43", "10"]],
+                        "bids": [],
+                        "timestamp": 1_700_000_000_010,
+                    },
+                    {
+                        "market": "0xabc",
+                        "asset_id": "no-token-abc",
+                        "asks": [["0.54", "10"]],
+                        "bids": [],
+                        "timestamp": 1_700_000_000_011,
+                    },
+                ]
             )
 
     monkeypatch.setattr(
