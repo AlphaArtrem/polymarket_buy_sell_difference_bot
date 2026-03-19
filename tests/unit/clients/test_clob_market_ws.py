@@ -19,8 +19,8 @@ def test_normalize_market_ws_message_extracts_book_update() -> None:
     assert message.asks[0].price == 0.41
 
 
-def test_build_market_subscription_uses_asset_ids() -> None:
+def test_build_market_subscription_uses_assets_ids() -> None:
     payload = build_market_subscription(["yes-token-1", "no-token-1"])
 
-    assert payload["asset_ids"] == ["yes-token-1", "no-token-1"]
+    assert payload["assets_ids"] == ["yes-token-1", "no-token-1"]
     assert payload["type"] == "market"

@@ -79,7 +79,7 @@ def normalize_market_ws_message(payload: dict[str, Any]) -> ClobMarketStreamMess
 
 
 def build_market_subscription(asset_ids: list[str]) -> dict[str, Any]:
-    return {"asset_ids": asset_ids, "type": "market"}
+    return {"assets_ids": asset_ids, "type": "market"}
 
 
 __all__ = [

@@ -129,7 +129,7 @@ def bench_latency(
         "market_ws_connect": measure_websocket_connect(
             settings.api.market_ws_url,
             subscription_payload={
-                "asset_ids": [first_market.yes_token_id, first_market.no_token_id],
+                "assets_ids": [first_market.yes_token_id, first_market.no_token_id],
                 "type": "market",
             },
             samples=samples,
