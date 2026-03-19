@@ -21,6 +21,16 @@ def test_analyze_recording_writes_opportunity_summary(tmp_path: Path) -> None:
               gamma_base_url: https://gamma-api.polymarket.com
               clob_base_url: https://clob.polymarket.com
               poll_interval_ms: 1
+            research:
+              keep_min_paired_snapshots_per_minute: 1
+              keep_min_post_cost_opportunities_per_minute: 1
+              keep_min_total_time_in_edge_ms: 0
+              keep_min_best_net_edge_bps: 100
+              keep_min_max_window_ms: 0
+              watch_min_paired_snapshots_per_minute: 0
+              watch_min_post_cost_opportunities_per_minute: 0
+              watch_min_best_net_edge_bps: 0
+              low_sample_paired_snapshot_floor: 1
             markets:
               - slug: market-one
                 max_capital_usd: 50
@@ -71,7 +81,7 @@ def test_analyze_recording_writes_opportunity_summary(tmp_path: Path) -> None:
                         "market_id": "m1",
                         "side": "NO",
                         "asks": [{"price": 0.49, "size": 100.0}],
-                        "timestamp_ms": 1000,
+                        "timestamp_ms": 2000,
                     }
                 ),
             ]
@@ -95,9 +105,15 @@ def test_analyze_recording_writes_opportunity_summary(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     summary = json.loads(
-        (output_dir / "opportunity_summary.json").read_text(encoding="utf-8")
+        (output_dir / "market_quality_summary.json").read_text(encoding="utf-8")
+    )
+    by_market = json.loads(
+        (output_dir / "market_quality_by_market.json").read_text(encoding="utf-8")
     )
     assert summary["event_count"] == 2
     assert summary["paired_snapshot_count"] == 1
     assert summary["raw_opportunity_count"] == 1
     assert summary["post_cost_opportunity_count"] == 1
+    assert summary["classification_counts"]["keep"] == 1
+    assert by_market[0]["best_net_edge_bps"] == 220
+    assert by_market[0]["status"] == "keep"

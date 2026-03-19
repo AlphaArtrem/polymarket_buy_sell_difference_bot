@@ -20,11 +20,13 @@ from polymarket_arb.ops.latency import (
 from polymarket_arb.recording.storage import JsonlEventStore, ReplayInputError
 from polymarket_arb.adapters.replay import ReplayAdapter
 from polymarket_arb.research.opportunities import analyze_recorded_opportunities
+from polymarket_arb.research.market_quality import MarketQualityReport, MarketQualityTracker
 from polymarket_arb.reporting.writers import (
     write_catalog_snapshot,
     write_feed_health,
     write_latency_summary,
-    write_opportunity_summary,
+    write_market_quality_by_market,
+    write_market_quality_summary,
     write_run_summary,
 )
 
@@ -98,6 +100,58 @@ def resolve_feed_health(adapter: object, *, mode: str | None = None) -> dict[str
         "stale_feed_events": 0,
         "reconnects": 0,
     }
+
+
+def build_market_quality_summary_payload(
+    report: MarketQualityReport,
+    *,
+    config_path: Path,
+    thresholds: dict[str, object],
+    feed_health: dict[str, int | str] | None = None,
+) -> dict[str, object]:
+    stream_message_count = report.stream_message_count
+    if feed_health is not None:
+        stream_message_count = int(feed_health.get("stream_messages_seen", 0))
+
+    return {
+        "config_path": str(config_path),
+        "run_duration_seconds": report.run_duration_seconds,
+        "event_count": report.event_count,
+        "stream_message_count": stream_message_count,
+        "paired_snapshot_count": report.paired_snapshot_count,
+        "raw_opportunity_count": report.raw_opportunity_count,
+        "post_cost_opportunity_count": report.post_cost_opportunity_count,
+        "opportunity_window_count": report.opportunity_window_count,
+        "classification_counts": report.classification_counts,
+        "top_markets": {
+            status: [
+                {
+                    "market_id": market.market_id,
+                    "slug": market.slug,
+                    "best_net_edge_bps": market.best_net_edge_bps,
+                }
+                for market in sorted(
+                    (item for item in report.markets if item.status == status),
+                    key=lambda item: (-item.best_net_edge_bps, item.slug),
+                )[:5]
+            ]
+            for status in ("keep", "watch", "drop")
+        },
+        "thresholds": thresholds,
+    }
+
+
+def build_market_quality_by_market_payload(
+    report: MarketQualityReport,
+) -> list[dict[str, object]]:
+    status_rank = {"keep": 0, "watch": 1, "drop": 2}
+    return [
+        market.model_dump()
+        for market in sorted(
+            report.markets,
+            key=lambda item: (status_rank.get(item.status, 99), -item.best_net_edge_bps, item.slug),
+        )
+    ]
 
 
 @app.command("bench-latency")
@@ -258,13 +312,58 @@ def run_paper(
     )
 
 
+@app.command("study-live-opportunities")
+def study_live_opportunities(
+    config_path: Path = typer.Option(..., "--config-path"),
+    output_dir: Path = typer.Option(..., "--output-dir"),
+    duration_seconds: int = typer.Option(300, "--duration-seconds"),
+    mode: str | None = typer.Option("stream", "--mode"),
+) -> None:
+    """Study live stream market quality without invoking the trading engine."""
+    settings = load_settings(config_path)
+    catalog = refresh_catalog(settings)
+    if not catalog:
+        typer.echo("No active curated binary markets were resolved from Gamma.", err=True)
+        raise typer.Exit(code=1)
+
+    adapter = resolve_live_adapter(settings, catalog, runtime_mode=mode)
+    tracker = MarketQualityTracker(
+        catalog=catalog,
+        stale_after_ms=settings.strategy.stale_after_ms,
+        fee_rate=settings.strategy.fee_rate,
+        slippage_buffer=settings.strategy.slippage_buffer,
+        operational_buffer=settings.strategy.operational_buffer,
+        research=settings.research,
+    )
+    for event in adapter.iter_events(limit_seconds=duration_seconds):
+        tracker.observe(event)
+
+    feed_health = resolve_feed_health(adapter, mode=mode or settings.runtime.mode)
+    tracker.note_stream_message(int(feed_health.get("stream_messages_seen", 0)))
+    report = tracker.finalize(run_duration_seconds=max(duration_seconds, 0))
+    write_market_quality_summary(
+        output_dir,
+        build_market_quality_summary_payload(
+            report,
+            config_path=config_path,
+            thresholds=settings.research.model_dump(),
+            feed_health=feed_health,
+        ),
+    )
+    write_market_quality_by_market(
+        output_dir,
+        build_market_quality_by_market_payload(report),
+    )
+    write_feed_health(output_dir / "feed_health.json", feed_health)
+
+
 @app.command("analyze-recording")
 def analyze_recording(
     config_path: Path = typer.Option(..., "--config-path"),
     run_dir: Path = typer.Option(..., "--run-dir"),
     output_dir: Path = typer.Option(..., "--output-dir"),
 ) -> None:
-    """Analyze recorded order books for full-set opportunity frequency."""
+    """Analyze recorded order books for market quality and selection."""
     settings = load_settings(config_path)
     store = JsonlEventStore(run_dir)
     try:
@@ -279,8 +378,20 @@ def analyze_recording(
         fee_rate=settings.strategy.fee_rate,
         slippage_buffer=settings.strategy.slippage_buffer,
         operational_buffer=settings.strategy.operational_buffer,
+        research=settings.research,
     )
-    write_opportunity_summary(output_dir, report)
+    write_market_quality_summary(
+        output_dir,
+        build_market_quality_summary_payload(
+            report,
+            config_path=config_path,
+            thresholds=settings.research.model_dump(),
+        ),
+    )
+    write_market_quality_by_market(
+        output_dir,
+        build_market_quality_by_market_payload(report),
+    )
 
 
 if __name__ == "__main__":

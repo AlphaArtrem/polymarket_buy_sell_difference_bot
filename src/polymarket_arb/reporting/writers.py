@@ -42,3 +42,25 @@ def write_opportunity_summary(output_dir: Path, payload: Any) -> Path:
         data = payload
     summary_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return summary_path
+
+
+def write_market_quality_summary(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "market_quality_summary.json"
+    if hasattr(payload, "model_dump"):
+        data = payload.model_dump()
+    else:
+        data = payload
+    summary_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return summary_path
+
+
+def write_market_quality_by_market(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / "market_quality_by_market.json"
+    if hasattr(payload, "model_dump"):
+        data = payload.model_dump()
+    else:
+        data = payload
+    report_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return report_path

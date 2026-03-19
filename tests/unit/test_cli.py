@@ -11,10 +11,12 @@ def test_cli_help_lists_core_commands() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
+    assert "analyze-recording" in result.stdout
     assert "catalog-refresh" in result.stdout
     assert "record-live" in result.stdout
     assert "run-replay" in result.stdout
     assert "run-paper" in result.stdout
+    assert "study-live-opportunities" in result.stdout
 
 
 def test_python_module_help_invokes_cli() -> None:
@@ -27,3 +29,4 @@ def test_python_module_help_invokes_cli() -> None:
     )
     assert result.returncode == 0
     assert "catalog-refresh" in result.stdout
+    assert "study-live-opportunities" in result.stdout
