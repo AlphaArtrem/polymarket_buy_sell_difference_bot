@@ -74,7 +74,7 @@ def normalize_market_ws_message(payload: dict[str, Any]) -> ClobMarketStreamMess
             if payload.get("asset_id") is not None
             else None
         ),
-        asks=[BookLevel(price=float(price), size=float(size)) for price, size in asks],
+        asks=_parse_levels(asks),
         timestamp_ms=(
             int(payload["timestamp"]) if payload.get("timestamp") is not None else None
         ),
@@ -83,6 +83,24 @@ def normalize_market_ws_message(payload: dict[str, Any]) -> ClobMarketStreamMess
 
 def build_market_subscription(asset_ids: list[str]) -> dict[str, Any]:
     return {"assets_ids": asset_ids, "type": "market"}
+
+
+def _parse_levels(value: Any) -> list[BookLevel]:
+    if value is None:
+        return []
+    levels: list[BookLevel] = []
+    for raw_level in value:
+        if isinstance(raw_level, dict):
+            levels.append(
+                BookLevel(
+                    price=float(raw_level["price"]),
+                    size=float(raw_level["size"]),
+                )
+            )
+            continue
+        price, size = raw_level
+        levels.append(BookLevel(price=float(price), size=float(size)))
+    return levels
 
 
 __all__ = [
