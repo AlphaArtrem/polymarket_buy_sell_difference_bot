@@ -9,6 +9,16 @@ runtime:
   mode: stream
   artifact_dir: artifacts/runtime
   polygon_rpc_url: https://polygon-rpc.example
+research:
+  keep_min_paired_snapshots_per_minute: 8
+  keep_min_post_cost_opportunities_per_minute: 1
+  keep_min_total_time_in_edge_ms: 3000
+  keep_min_best_net_edge_bps: 15
+  keep_min_max_window_ms: 1500
+  watch_min_paired_snapshots_per_minute: 3
+  watch_min_post_cost_opportunities_per_minute: 0.2
+  watch_min_best_net_edge_bps: 5
+  low_sample_paired_snapshot_floor: 5
 markets:
   - slug: bitboy-convicted
     max_capital_usd: 50

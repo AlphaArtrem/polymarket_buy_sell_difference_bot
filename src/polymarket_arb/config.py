@@ -37,6 +37,18 @@ class RuntimeSettings(BaseModel):
     polygon_rpc_url: str | None = None
 
 
+class ResearchSettings(BaseModel):
+    keep_min_paired_snapshots_per_minute: float = Field(ge=0, default=0)
+    keep_min_post_cost_opportunities_per_minute: float = Field(ge=0, default=0)
+    keep_min_total_time_in_edge_ms: int = Field(ge=0, default=0)
+    keep_min_best_net_edge_bps: float = Field(ge=0, default=0)
+    keep_min_max_window_ms: int = Field(ge=0, default=0)
+    watch_min_paired_snapshots_per_minute: float = Field(ge=0, default=0)
+    watch_min_post_cost_opportunities_per_minute: float = Field(ge=0, default=0)
+    watch_min_best_net_edge_bps: float = Field(ge=0, default=0)
+    low_sample_paired_snapshot_floor: int = Field(ge=0, default=0)
+
+
 class Settings(BaseModel):
     venue: str
     api: ApiSettings
@@ -44,6 +56,7 @@ class Settings(BaseModel):
     strategy: StrategySettings
     portfolio: PortfolioSettings
     runtime: RuntimeSettings = RuntimeSettings()
+    research: ResearchSettings = ResearchSettings()
 
 
 def load_settings(path: Path) -> Settings:
