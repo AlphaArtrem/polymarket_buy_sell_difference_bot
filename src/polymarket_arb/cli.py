@@ -12,7 +12,11 @@ from polymarket_arb.recording.recorder import Recorder
 from polymarket_arb.config import Settings, load_settings
 from polymarket_arb.domain.models import MarketCatalogEntry
 from polymarket_arb.engine import TradingEngine
-from polymarket_arb.ops.latency import measure_http_endpoint, measure_websocket_connect
+from polymarket_arb.ops.latency import (
+    measure_http_endpoint,
+    measure_websocket_connect,
+    measure_websocket_subscription,
+)
 from polymarket_arb.recording.storage import JsonlEventStore, ReplayInputError
 from polymarket_arb.adapters.replay import ReplayAdapter
 from polymarket_arb.research.opportunities import analyze_recorded_opportunities
@@ -135,6 +139,16 @@ def bench_latency(
             samples=samples,
         ),
     }
+    summaries.update(
+        measure_websocket_subscription(
+            settings.api.market_ws_url,
+            subscription_payload={
+                "assets_ids": [first_market.yes_token_id, first_market.no_token_id],
+                "type": "market",
+            },
+            samples=samples,
+        )
+    )
     if settings.runtime.polygon_rpc_url:
         summaries["polygon_rpc"] = measure_http_endpoint(
             settings.runtime.polygon_rpc_url,

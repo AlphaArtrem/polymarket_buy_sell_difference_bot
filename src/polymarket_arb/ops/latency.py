@@ -64,3 +64,45 @@ def measure_websocket_connect(
         asyncio.run(_probe())
         latencies.append(round((time.perf_counter() - started) * 1000, 3))
     return latencies
+
+
+def measure_websocket_subscription(
+    url: str,
+    *,
+    subscription_payload: dict[str, Any],
+    samples: int = 3,
+    messages_per_sample: int = 3,
+    timeout: float = 10.0,
+) -> dict[str, list[float]]:
+    first_message_latencies: list[float] = []
+    steady_state_gaps: list[float] = []
+
+    for _ in range(max(samples, 0)):
+        async def _probe() -> tuple[float | None, list[float]]:
+            async with websockets.connect(url) as websocket:
+                started = time.perf_counter()
+                await websocket.send(json.dumps(subscription_payload))
+                first_raw = await asyncio.wait_for(websocket.recv(), timeout=timeout)
+                _ = first_raw
+                first_latency = round((time.perf_counter() - started) * 1000, 3)
+
+                gaps: list[float] = []
+                last = time.perf_counter()
+                for _ in range(max(messages_per_sample - 1, 0)):
+                    await asyncio.wait_for(websocket.recv(), timeout=timeout)
+                    now = time.perf_counter()
+                    gaps.append(round((now - last) * 1000, 3))
+                    last = now
+                return first_latency, gaps
+
+        import asyncio
+
+        first_latency, gaps = asyncio.run(_probe())
+        if first_latency is not None:
+            first_message_latencies.append(first_latency)
+        steady_state_gaps.extend(gaps)
+
+    return {
+        "first_message_after_subscribe_ms": first_message_latencies,
+        "steady_state_message_gap_ms": steady_state_gaps,
+    }

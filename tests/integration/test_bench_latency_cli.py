@@ -53,6 +53,13 @@ def test_bench_latency_command_writes_summary_artifact(
         lambda *args, **kwargs: [20.0, 22.0, 24.0],
     )
     monkeypatch.setattr(
+        "polymarket_arb.cli.measure_websocket_subscription",
+        lambda *args, **kwargs: {
+            "first_message_after_subscribe_ms": [6.0, 7.0, 9.0],
+            "steady_state_message_gap_ms": [11.0, 13.0, 15.0],
+        },
+    )
+    monkeypatch.setattr(
         "polymarket_arb.cli.refresh_catalog",
         lambda settings: [
             MarketCatalogEntry(
@@ -84,4 +91,6 @@ def test_bench_latency_command_writes_summary_artifact(
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["gamma"]["p50_ms"] == 14.0
     assert payload["market_ws_connect"]["p50_ms"] == 22.0
+    assert payload["first_message_after_subscribe_ms"]["p50_ms"] == 7.0
+    assert payload["steady_state_message_gap_ms"]["p50_ms"] == 13.0
     assert payload["polygon_rpc"]["count"] == 3
