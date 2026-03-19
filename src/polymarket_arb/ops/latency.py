@@ -89,7 +89,10 @@ def measure_websocket_subscription(
                 gaps: list[float] = []
                 last = time.perf_counter()
                 for _ in range(max(messages_per_sample - 1, 0)):
-                    await asyncio.wait_for(websocket.recv(), timeout=timeout)
+                    try:
+                        await asyncio.wait_for(websocket.recv(), timeout=timeout)
+                    except TimeoutError:
+                        break
                     now = time.perf_counter()
                     gaps.append(round((now - last) * 1000, 3))
                     last = now
