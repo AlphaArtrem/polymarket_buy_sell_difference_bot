@@ -41,10 +41,20 @@ from polymarket_arb.reporting.writers import (
     write_open_positions,
     write_rejection_log,
     write_run_summary,
+    write_structure_by_relationship,
+    write_structure_summary,
     write_trade_log,
 )
 from polymarket_arb.sources.adapters import normalize_http_json_payload
 from polymarket_arb.sources.registry import load_source_registry
+from polymarket_arb.state.store import MarketStateStore
+from polymarket_arb.structure.ranking import rank_structure_relationships
+from polymarket_arb.structure.registry import (
+    ResolvedStructureDefinition,
+    load_structure_registry,
+    resolve_structure_registry,
+)
+from polymarket_arb.structure.scanner import StructureScanner
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -356,6 +366,204 @@ def build_market_quality_by_market_payload(
     ]
 
 
+def expand_structure_catalog(settings: Settings) -> list[MarketCatalogEntry]:
+    markets = make_gamma_client(settings).fetch_markets_by_slugs(
+        [selection.slug for selection in settings.markets]
+    )
+    return build_candidate_catalog(markets)
+
+
+def _best_ask(levels: list[BookLevel]) -> BookLevel | None:
+    if not levels:
+        return None
+    return levels[0]
+
+
+def _scan_structure_relationship(
+    store: MarketStateStore,
+    scanner: StructureScanner,
+    relationship: ResolvedStructureDefinition,
+    *,
+    market_id: str,
+    side: str,
+    timestamp_ms: int,
+) -> object | None:
+    if relationship.relationship_type == "mutually_exclusive_yes":
+        if side != "YES":
+            return None
+        yes_quotes: list[dict[str, float]] = []
+        for slug, related_market_id in zip(relationship.market_slugs, relationship.market_ids):
+            try:
+                book = store.get_book(related_market_id, timestamp_ms)
+            except (KeyError, ValueError):
+                return None
+            best_yes = _best_ask(book.yes_asks)
+            if best_yes is None:
+                return None
+            yes_quotes.append(
+                {
+                    "slug": slug,
+                    "price": best_yes.price,
+                    "size": best_yes.size,
+                }
+            )
+        return scanner.scan_mutually_exclusive_yes(
+            key=relationship.key,
+            yes_quotes=yes_quotes,
+        )
+
+    if relationship.relationship_type == "implies_yes":
+        if len(relationship.market_ids) != 2:
+            return None
+        child_market_id, parent_market_id = relationship.market_ids
+        should_scan = (
+            market_id == child_market_id and side == "YES"
+        ) or (
+            market_id == parent_market_id and side == "NO"
+        )
+        if not should_scan:
+            return None
+        try:
+            child_book = store.get_book(child_market_id, timestamp_ms)
+            parent_book = store.get_book(parent_market_id, timestamp_ms)
+        except (KeyError, ValueError):
+            return None
+        best_child_yes = _best_ask(child_book.yes_asks)
+        best_parent_no = _best_ask(parent_book.no_asks)
+        if best_child_yes is None or best_parent_no is None:
+            return None
+        return scanner.scan_implication_pair(
+            key=relationship.key,
+            yes_child_price=best_child_yes.price,
+            no_parent_price=best_parent_no.price,
+            child_size=best_child_yes.size,
+            parent_size=best_parent_no.size,
+        )
+
+    return None
+
+
+def build_structure_study_outputs(
+    settings: Settings,
+    *,
+    config_path: Path,
+    duration_seconds: int,
+    mode: str | None,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    catalog = expand_structure_catalog(settings)
+    registry = load_structure_registry(
+        resolve_config_relative_path(
+            config_path,
+            settings.structure_research.relationship_registry_path,
+        )
+    )
+    resolved_relationships = resolve_structure_registry(registry, catalog)
+    adapter = resolve_live_adapter(settings, catalog, runtime_mode=mode)
+    scanner = StructureScanner(
+        min_raw_gap_bps=settings.structure_research.min_raw_gap_bps,
+        min_net_gap_bps=settings.structure_research.min_net_gap_bps,
+        fee_rate=settings.strategy.fee_rate,
+        slippage_buffer=settings.strategy.slippage_buffer,
+        operational_buffer=settings.strategy.operational_buffer,
+        min_executable_size=settings.structure_research.min_executable_size,
+    )
+    store = MarketStateStore(settings.strategy.stale_after_ms)
+    relationships_by_market_id: dict[str, list[ResolvedStructureDefinition]] = {}
+    for relationship in resolved_relationships:
+        for market_id in relationship.market_ids:
+            relationships_by_market_id.setdefault(market_id, []).append(relationship)
+
+    stats_by_key: dict[str, dict[str, object]] = {}
+    for event in adapter.iter_events(limit_seconds=duration_seconds):
+        store.apply(event)
+        for relationship in relationships_by_market_id.get(event.market_id, []):
+            opportunity = _scan_structure_relationship(
+                store,
+                scanner,
+                relationship,
+                market_id=event.market_id,
+                side=event.side,
+                timestamp_ms=event.timestamp_ms,
+            )
+            if opportunity is None:
+                continue
+            row = stats_by_key.setdefault(
+                relationship.key,
+                {
+                    "key": relationship.key,
+                    "relationship_type": relationship.relationship_type,
+                    "market_slugs": relationship.market_slugs,
+                    "market_ids": relationship.market_ids,
+                    "opportunity_count": 0,
+                    "best_raw_gap_bps": 0.0,
+                    "best_net_gap_bps": 0.0,
+                    "total_executable_size": 0.0,
+                },
+            )
+            row["opportunity_count"] = int(row["opportunity_count"]) + 1
+            row["best_raw_gap_bps"] = max(
+                float(row["best_raw_gap_bps"]),
+                float(opportunity.raw_gap_bps),
+            )
+            row["best_net_gap_bps"] = max(
+                float(row["best_net_gap_bps"]),
+                float(opportunity.net_gap_bps),
+            )
+            row["total_executable_size"] = float(row["total_executable_size"]) + float(
+                opportunity.executable_size
+            )
+
+    rows: list[dict[str, object]] = []
+    for row in stats_by_key.values():
+        opportunity_count = int(row["opportunity_count"])
+        mean_executable_size = (
+            float(row["total_executable_size"]) / opportunity_count
+            if opportunity_count
+            else 0.0
+        )
+        rows.append(
+            {
+                "key": row["key"],
+                "relationship_type": row["relationship_type"],
+                "market_slugs": row["market_slugs"],
+                "market_ids": row["market_ids"],
+                "opportunity_count": opportunity_count,
+                "best_raw_gap_bps": float(row["best_raw_gap_bps"]),
+                "best_net_gap_bps": float(row["best_net_gap_bps"]),
+                "mean_executable_size": mean_executable_size,
+            }
+        )
+
+    ranked = rank_structure_relationships(rows)
+    rows_by_key = {row["key"]: row for row in rows}
+    by_relationship = [
+        {
+            **rows_by_key[item.key],
+            "score": item.score,
+        }
+        for item in ranked
+    ]
+    summary = {
+        "config_path": str(config_path),
+        "run_duration_seconds": max(duration_seconds, 0),
+        "candidate_market_count": len(catalog),
+        "resolved_relationship_count": len(resolved_relationships),
+        "relationship_count": len(by_relationship),
+        "opportunity_count": sum(item["opportunity_count"] for item in by_relationship),
+        "thresholds": settings.structure_research.model_dump(),
+        "top_relationships": [
+            {
+                "key": item["key"],
+                "relationship_type": item["relationship_type"],
+                "best_net_gap_bps": item["best_net_gap_bps"],
+                "opportunity_count": item["opportunity_count"],
+            }
+            for item in by_relationship[:5]
+        ],
+    }
+    return summary, by_relationship
+
+
 @app.command("bench-latency")
 def bench_latency(
     config_path: Path = typer.Option(..., "--config-path"),
@@ -618,6 +826,25 @@ def run_event_paper(
     write_rejection_log(output_dir, artifacts["rejections"])
     write_exit_log(output_dir, artifacts["exit_log"])
     write_open_positions(output_dir, artifacts["open_positions"])
+
+
+@app.command("study-structure-opportunities")
+def study_structure_opportunities(
+    config_path: Path = typer.Option(..., "--config-path"),
+    output_dir: Path = typer.Option(..., "--output-dir"),
+    duration_seconds: int = typer.Option(300, "--duration-seconds"),
+    mode: str | None = typer.Option(None, "--mode"),
+) -> None:
+    """Study structural relationship pricing gaps across linked markets."""
+    settings = load_settings(config_path)
+    summary, by_relationship = build_structure_study_outputs(
+        settings,
+        config_path=config_path,
+        duration_seconds=duration_seconds,
+        mode=mode,
+    )
+    write_structure_summary(output_dir, summary)
+    write_structure_by_relationship(output_dir, by_relationship)
 
 
 @app.command("analyze-recording")

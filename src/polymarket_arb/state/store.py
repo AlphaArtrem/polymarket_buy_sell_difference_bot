@@ -35,3 +35,12 @@ class MarketStateStore:
         if now_ms - max(book.last_yes_ms, book.last_no_ms) > self._stale_after_ms:
             raise ValueError("stale market data")
         return book
+
+    def get_book(self, market_id: str, now_ms: int) -> PairedBook:
+        book = self._books[market_id]
+        latest_timestamp_ms = max(book.last_yes_ms, book.last_no_ms)
+        if latest_timestamp_ms <= 0:
+            raise ValueError("market data unavailable")
+        if now_ms - latest_timestamp_ms > self._stale_after_ms:
+            raise ValueError("stale market data")
+        return book

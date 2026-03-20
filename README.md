@@ -16,6 +16,7 @@ PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli analyze-recording --config
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli catalog-expand --config-path configs/event_research.sample.yaml --output-path artifacts/event-catalog.json
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli study-source-lag --config-path configs/event_research.sample.yaml --output-dir artifacts/source-lag --source-payload-path tests/fixtures/sources/objective_update.json
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli run-event-paper --config-path configs/event_research.sample.yaml --output-dir artifacts/event-paper --source-payload-path tests/fixtures/sources/objective_update.json
+PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli study-structure-opportunities --config-path configs/structure_research.sample.yaml --output-dir artifacts/structure-study --duration-seconds 300 --mode stream
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli run-paper --config-path configs/markets.sample.yaml --output-dir artifacts/paper-report --duration-seconds 10 --mode stream
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli run-replay --config-path configs/markets.sample.yaml --run-dir artifacts/demo-run --output-dir artifacts/demo-report
 ```
@@ -61,3 +62,16 @@ Phase 2.3 artifacts:
 - `rejections.json`: rejected entries with reason codes and timestamps
 - `exit_log.json`: realized exit attempts and exit-mode outcomes
 - `open_positions.json`: remaining directional exposure after the replay completes
+
+## Phase 3 Structural Workflow
+
+Use the Phase 3 workflow when you want to scan linked Polymarket markets for structural pricing gaps instead of analyzing single-market source lag.
+
+1. Maintain linked-market definitions in `configs/structure_registry.sample.yaml` or a copy of it next to your config.
+2. Run `study-structure-opportunities` against a curated market set to scan mutually exclusive baskets and implication pairs.
+3. Review `structure_summary.json` for run-level counts and `structure_by_relationship.json` for ranked relationship-level gaps.
+
+Phase 3 artifacts:
+
+- `structure_summary.json`: run-level summary, threshold settings, relationship counts, and top-ranked structures
+- `structure_by_relationship.json`: ranked relationship-level report with relationship type, market slugs, opportunity counts, gap measurements, and score
