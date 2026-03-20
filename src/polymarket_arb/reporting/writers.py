@@ -86,6 +86,22 @@ def write_event_rankings(output_dir: Path, payload: Any) -> Path:
     return report_path
 
 
+def write_structure_summary(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "structure_summary.json"
+    data = _serialize_payload(payload)
+    summary_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return summary_path
+
+
+def write_structure_by_relationship(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / "structure_by_relationship.json"
+    data = _serialize_payload(payload)
+    report_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return report_path
+
+
 def write_trade_log(output_dir: Path, payload: Any) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     trade_log_path = output_dir / "trade_log.json"
