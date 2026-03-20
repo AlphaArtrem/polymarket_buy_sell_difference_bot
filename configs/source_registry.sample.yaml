@@ -1,0 +1,8 @@
+sources:
+  - key: sec-filing
+    source_type: http_json
+    url: https://example.com/api
+    parser: sec_status
+    market_slugs:
+      - market-one
+    implied_direction: yes

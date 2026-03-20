@@ -49,6 +49,15 @@ class ResearchSettings(BaseModel):
     low_sample_paired_snapshot_floor: int = Field(ge=0, default=0)
 
 
+class EventResearchSettings(BaseModel):
+    candidate_market_limit: int = Field(gt=0, default=100)
+    source_registry_path: str = "configs/source_registry.sample.yaml"
+    response_window_seconds: int = Field(gt=0, default=120)
+    max_signal_age_seconds: int = Field(gt=0, default=15)
+    min_expected_edge_bps: float = Field(ge=0, default=25)
+    default_exit_mode: str = "repricing_target"
+
+
 class Settings(BaseModel):
     venue: str
     api: ApiSettings
@@ -57,6 +66,7 @@ class Settings(BaseModel):
     portfolio: PortfolioSettings
     runtime: RuntimeSettings = RuntimeSettings()
     research: ResearchSettings = ResearchSettings()
+    event_research: EventResearchSettings = EventResearchSettings()
 
 
 def load_settings(path: Path) -> Settings:
