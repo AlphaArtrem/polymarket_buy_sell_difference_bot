@@ -66,3 +66,26 @@ def test_fetch_markets_by_slugs_skips_missing_slug_results() -> None:
     )
 
     assert [market["slug"] for market in markets] == ["will-btc-be-above-100k"]
+
+
+def test_fetch_active_markets_respects_limit() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["limit"] == "2"
+        return httpx.Response(
+            200,
+            json=[
+                {"id": "1", "slug": "a", "active": True, "closed": False},
+                {"id": "2", "slug": "b", "active": True, "closed": False},
+            ],
+        )
+
+    client = GammaClient(
+        client=httpx.Client(
+            base_url="https://gamma-api.polymarket.com",
+            transport=httpx.MockTransport(handler),
+        )
+    )
+
+    markets = client.fetch_active_markets(limit=2)
+
+    assert [market["id"] for market in markets] == ["1", "2"]

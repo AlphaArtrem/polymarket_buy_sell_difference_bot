@@ -28,3 +28,11 @@ class GammaClient:
             except LookupError:
                 continue
         return markets
+
+    def fetch_active_markets(self, *, limit: int) -> list[dict[str, Any]]:
+        response = self._client.get(
+            "/markets",
+            params={"active": True, "closed": False, "limit": limit},
+        )
+        response.raise_for_status()
+        return list(response.json())

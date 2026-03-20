@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 
 from polymarket_arb.clients.gamma import GammaClient
 from polymarket_arb.config import MarketSelection
-from polymarket_arb.domain.models import MarketCatalogEntry
+from polymarket_arb.domain.models import EnrichedMarketEntry, MarketCatalogEntry
 
 
 def build_catalog(
@@ -34,6 +34,34 @@ def build_catalog(
     return entries
 
 
+def build_candidate_catalog(markets: list[dict[str, Any]]) -> list[EnrichedMarketEntry]:
+    entries: list[EnrichedMarketEntry] = []
+    for market in markets:
+        token_pair = resolve_binary_token_pair(market)
+        if token_pair is None or not market.get("active") or market.get("closed"):
+            continue
+        slug = str(market["slug"])
+        entries.append(
+            EnrichedMarketEntry(
+                market_id=str(market["id"]),
+                slug=slug,
+                question=str(market.get("question") or slug),
+                yes_token_id=token_pair[0],
+                no_token_id=token_pair[1],
+                fees_enabled=bool(market.get("feesEnabled", False)),
+                max_capital_usd=0.0,
+                active=True,
+                category=str(market.get("category")) if market.get("category") else None,
+                end_date_iso=str(market.get("endDate")) if market.get("endDate") else None,
+                resolution_text=(
+                    str(market.get("description")) if market.get("description") else None
+                ),
+                tags=classify_candidate_tags(market),
+            )
+        )
+    return entries
+
+
 def refresh_catalog(
     *, gamma_client: GammaClient, selections: list[MarketSelection]
 ) -> list[MarketCatalogEntry]:
@@ -42,6 +70,18 @@ def refresh_catalog(
     }
     markets = gamma_client.fetch_markets_by_slugs(list(allowlist_caps))
     return build_catalog(markets, allowlist_caps=allowlist_caps)
+
+
+def classify_candidate_tags(market: dict[str, Any]) -> list[str]:
+    tags: list[str] = []
+    category = market.get("category")
+    if isinstance(category, str) and category.strip():
+        tags.append(category.strip().lower())
+    if market.get("description"):
+        tags.append("objective_source_candidate")
+    else:
+        tags.append("manual_review_required")
+    return tags
 
 
 def resolve_binary_token_pair(market: dict[str, Any]) -> tuple[str, str] | None:
