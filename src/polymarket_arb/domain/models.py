@@ -87,3 +87,20 @@ class Opportunity(BaseModel):
     no_ask: float
     estimated_net_cost: float
     paired_size: float
+
+
+class DirectionalFillRecord(BaseModel):
+    market_id: str
+    direction: str
+    requested_size: float
+    filled_size: float
+    average_price: float
+    status: str
+    exit_mode: str
+
+
+class EventPaperRejectionRecord(BaseModel):
+    market_id: str
+    slug: str
+    timestamp_ms: int
+    reason: str

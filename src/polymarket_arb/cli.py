@@ -15,7 +15,7 @@ from polymarket_arb.clients.clob import ClobWebSocketClient
 from polymarket_arb.clients.gamma import GammaClient
 from polymarket_arb.recording.recorder import Recorder
 from polymarket_arb.config import Settings, load_settings
-from polymarket_arb.domain.models import MarketCatalogEntry
+from polymarket_arb.domain.models import BookLevel, MarketCatalogEntry
 from polymarket_arb.engine import TradingEngine
 from polymarket_arb.ops.latency import (
     measure_http_endpoint,
@@ -33,10 +33,13 @@ from polymarket_arb.reporting.writers import (
     write_catalog_snapshot,
     write_event_lag_summary,
     write_event_rankings,
+    write_exit_log,
     write_feed_health,
     write_latency_summary,
     write_market_quality_by_market,
     write_market_quality_summary,
+    write_open_positions,
+    write_rejection_log,
     write_run_summary,
     write_trade_log,
 )
@@ -174,7 +177,7 @@ def build_event_paper_outputs(
     *,
     config_path: Path,
     source_payload_path: Path,
-) -> tuple[dict[str, object], list[object]]:
+) -> tuple[dict[str, object], dict[str, object]]:
     summaries, _ = build_source_lag_outputs(
         settings,
         config_path=config_path,
@@ -194,8 +197,13 @@ def build_event_paper_outputs(
         starting_cash_usd=settings.portfolio.starting_cash_usd,
         max_total_deployed_usd=settings.portfolio.max_total_deployed_usd,
         default_exit_mode=settings.event_research.default_exit_mode,
+        repricing_target_bps=settings.event_research.repricing_target_bps,
+        max_holding_seconds=settings.event_research.max_holding_seconds,
+        entry_slippage_buffer=settings.strategy.slippage_buffer,
+        exit_slippage_buffer=settings.event_research.exit_slippage_buffer,
+        allow_hold_to_resolution=settings.event_research.allow_hold_to_resolution,
     )
-    outcomes = []
+    timestamp_ms = coerce_timestamp_ms(payload.get("market_timestamp_ms", payload.get("timestamp")))
     for definition in registry.sources:
         direction = definition.implied_direction.upper()
         best_ask_key = "best_yes_ask" if direction == "YES" else "best_no_ask"
@@ -208,31 +216,42 @@ def build_event_paper_outputs(
                 entry.market_id,
                 EventLagSummary(market_id=entry.market_id, source_event_id=""),
             ).best_entry_edge_bps
-            outcomes.append(
-                runner.on_signal(
-                    market_id=entry.market_id,
-                    slug=entry.slug,
-                    direction=direction,
-                    expected_edge_bps=expected_edge_bps,
-                    best_ask=float(payload.get(best_ask_key, 0.0)),
-                    available_size=float(payload.get(available_size_key, 0.0)),
-                    timestamp_ms=coerce_timestamp_ms(
-                        payload.get("market_timestamp_ms", payload.get("timestamp"))
-                    ),
-                )
+            ask_price = float(payload.get(best_ask_key, 0.0))
+            available_size = float(payload.get(available_size_key, 0.0))
+            bid_price = max(0.0, ask_price - 0.01)
+            asks = []
+            bids = []
+            if ask_price > 0 and available_size > 0:
+                asks = [BookLevel(price=ask_price, size=available_size)]
+                bids = [BookLevel(price=bid_price, size=available_size)]
+            runner.on_signal(
+                market_id=entry.market_id,
+                slug=entry.slug,
+                direction=direction,
+                expected_edge_bps=expected_edge_bps,
+                asks=asks,
+                bids=bids,
+                timestamp_ms=timestamp_ms,
             )
 
-    trade_log = [outcome.trade for outcome in outcomes if outcome.trade is not None]
+    open_positions = runner.ledger.open_positions()
     summary = {
-        "trades": len(trade_log),
-        "rejections": sum(1 for outcome in outcomes if outcome.decision != "trade"),
+        "trades": len(runner.trade_log),
+        "rejections": len(runner.rejection_log),
         "starting_cash_usd": settings.portfolio.starting_cash_usd,
         "free_cash_usd": runner.ledger.free_cash_usd,
         "deployed_cost_basis_usd": runner.ledger.deployed_cost_basis_usd,
         "realized_pnl_usd": runner.ledger.realized_pnl_usd,
         "default_exit_mode": settings.event_research.default_exit_mode,
+        "open_positions": len(open_positions),
     }
-    return summary, trade_log
+    artifacts = {
+        "trade_log": runner.trade_log,
+        "rejections": runner.rejection_log,
+        "exit_log": runner.exit_log,
+        "open_positions": open_positions,
+    }
+    return summary, artifacts
 
 
 def build_live_adapter(
@@ -589,13 +608,16 @@ def run_event_paper(
 ) -> None:
     """Run one-sided event paper trading from replayable source payloads."""
     settings = load_settings(config_path)
-    summary, trade_log = build_event_paper_outputs(
+    summary, artifacts = build_event_paper_outputs(
         settings,
         config_path=config_path,
         source_payload_path=source_payload_path,
     )
     write_run_summary(output_dir, summary)
-    write_trade_log(output_dir, trade_log)
+    write_trade_log(output_dir, artifacts["trade_log"])
+    write_rejection_log(output_dir, artifacts["rejections"])
+    write_exit_log(output_dir, artifacts["exit_log"])
+    write_open_positions(output_dir, artifacts["open_positions"])
 
 
 @app.command("analyze-recording")

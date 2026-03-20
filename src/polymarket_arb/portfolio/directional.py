@@ -42,11 +42,22 @@ class DirectionalLedger:
         self._positions[trade_id] = position
         return trade_id
 
-    def close_position(self, *, trade_id: str, exit_price: float) -> None:
-        position = self._positions.pop(trade_id)
-        exit_value = position.size * exit_price
+    def close_position(
+        self, *, trade_id: str, exit_price: float, close_size: float | None = None
+    ) -> None:
+        position = self._positions[trade_id]
+        realized_size = position.size if close_size is None else close_size
+        exit_value = realized_size * exit_price
+        realized_cost_basis = position.entry_price * realized_size
         self.free_cash_usd = round(self.free_cash_usd + exit_value, 10)
         self.realized_pnl_usd = round(
-            self.realized_pnl_usd + exit_value - position.cost_basis_usd,
+            self.realized_pnl_usd + exit_value - realized_cost_basis,
             10,
         )
+        if realized_size >= position.size:
+            self._positions.pop(trade_id)
+            return
+        position.size = round(position.size - realized_size, 10)
+
+    def open_positions(self) -> list[DirectionalPosition]:
+        return list(self._positions.values())

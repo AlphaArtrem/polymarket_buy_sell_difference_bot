@@ -50,11 +50,14 @@ Use the Phase 2.3 workflow when a market has an explicit external source and you
 1. Run `catalog-expand` to snapshot a broader candidate universe with resolution text and source-candidate tags.
 2. Maintain the market-to-source mapping in `configs/source_registry.sample.yaml` or a copy of it next to your config.
 3. Run `study-source-lag` with a replayable JSON source payload to write `event_lag_summary.json` and `event_rankings.json`.
-4. Run `run-event-paper` against the same source payload to write `summary.json` and `trade_log.json`.
+4. Run `run-event-paper` against the same source payload to write `summary.json`, `trade_log.json`, `rejections.json`, `exit_log.json`, and `open_positions.json`.
 
 Phase 2.3 artifacts:
 
 - `event_lag_summary.json`: per-market source-event lag and entry-edge measurements
 - `event_rankings.json`: ranked candidate markets weighted toward repeatable source edge
 - `summary.json`: run-level event-paper counts and cash/deployment state
-- `trade_log.json`: accepted event-paper trades with direction, size, entry price, and timestamp
+- `trade_log.json`: accepted event-paper trades with realized entry price, direction, size, and timestamp
+- `rejections.json`: rejected entries with reason codes and timestamps
+- `exit_log.json`: realized exit attempts and exit-mode outcomes
+- `open_positions.json`: remaining directional exposure after the replay completes
