@@ -1,594 +1,677 @@
-# Polymarket Full-Set Arbitrage Bot Design
+# Polymarket Edge Research And Trading Platform Design
 
 Status: Approved for planning
-Date: 2026-03-17
-Topic: Beginner-first Polymarket arbitrage bot with shared backtesting and live paper-trading core
+Date: 2026-03-20
+Topic: Pivot from full-set arbitrage to evidence-driven Polymarket trading, with objective external-signal research as the next phase
 
 ## Summary
 
-This spec defines the first slice of a Polymarket bot that targets binary full-set arbitrage on a curated set of markets.
+This spec replaces the original single-strategy full-set arbitrage framing with a broader design based on what the project has now learned from live market study work.
 
-The bot will:
+The important result is no longer in doubt:
 
-- Watch curated binary Polymarket markets in real time.
-- Detect cases where buying both `YES` and `NO` can produce positive expected value after modeled costs.
-- Simulate taker-only execution on both legs.
-- Reuse the same trading core in both historical replay and live paper-trading modes.
-- Enforce portfolio constraints from day one.
+- the current infrastructure is good enough to stream, record, replay, and study live Polymarket books
+- the recent three-bucket market study did not find raw top-of-book full-set arbitrage in the tested market set
+- the blocker is now strategy edge, not basic transport latency
 
-The bot will not place real orders in this phase.
+The project should therefore pivot from "build a bot around one assumed arbitrage edge" to "build a disciplined platform for discovering, testing, and eventually trading only edges that survive real evidence."
+
+The recommended next phase is:
+
+- objective-source event research for one-sided informational trading
+
+That phase will:
+
+- expand the candidate market universe
+- attach markets to explicit, auditable external sources
+- ingest source updates and compare them to Polymarket price response
+- measure lead-lag windows, depth, and executable paper edge
+- rank markets and source types by observed edge quality
+
+This phase remains paper-only and research-first. No authenticated trading belongs in the immediate next phase.
 
 ## Project Context
 
-The workspace for this project is currently greenfield. There is no existing application structure, no prior implementation, and no prior local design documentation in `/Users/alphaartrem/Desktop/workspace/trading_bot`.
+The repo is no longer greenfield. Current code can already:
 
-The user wants to learn in stages:
+- load and refresh a configured Polymarket market catalog
+- resolve token IDs and market metadata from Gamma
+- benchmark HTTP and WebSocket latency
+- stream public CLOB market data
+- record normalized live events
+- replay recorded runs deterministically
+- run paper trading over the same shared engine shape
+- analyze market quality for a configured market set
 
-1. Backtesting
-2. Paper trading
-3. Small live deployment with gradually increasing capital
+Recent research changed the strategic conclusion:
 
-This first spec covers only the Polymarket portion of that path.
+- small, medium, and large market buckets all produced `raw_opportunity_count=0`
+- the best observed raw sums stayed at or above parity rather than below it
+- more message traffic did not create raw edge
+- one study run died on a WebSocket disconnect, confirming that operational hardening still matters, but not as the main source of lost edge
+
+The important implication is:
+
+- the current market set is not a good fit for top-of-book full-set arbitrage
+- lowering thresholds will not create profit when raw edge is absent
+- deeper accounting work is still valuable later, but not as the next strategic move
+
+This spec makes the main design document the durable source of truth for the new direction.
 
 ## Problem Statement
 
-Each binary Polymarket market resolves to exactly one unit of collateral across a complete `YES + NO` pair. In ideal pricing, the taker cost of buying both sides should not exceed `1.00`. In practice, fast-moving markets and thin orderbooks can create temporary dislocations where both sides can be bought for less than `1.00`.
+The project no longer needs to answer "can a curated set of binary markets produce taker full-set arbitrage?"
 
-The naive version of this idea is: if `YES ask + NO ask < 1.00`, buy both and lock in profit.
+The live study already answered that for the current universe:
 
-The realistic version is more constrained:
+- not in a way worth pursuing
 
-- Fees may apply.
-- Visible size may be too small.
-- One leg may fill while the other does not.
-- Historical price series alone are not enough to reconstruct true taker execution.
-- Profit is not realized until the full paired position is actually closed via merge or held to resolution.
+The new problem is:
 
-This spec is designed around the realistic version, not the naive one.
+- which Polymarket strategy classes can plausibly produce real edge under current venue mechanics
+- how can the bot measure that edge with enough discipline to reject false positives quickly
+- how can the existing streaming, recording, replay, and research stack be reused instead of discarded
+
+The next strategy should satisfy at least one of these edge sources:
+
+1. objective external information reaches us before the market fully reprices
+2. multiple related markets become logically inconsistent
+3. passive liquidity incentives compensate for adverse selection and inventory risk
+
+The recommended immediate focus is the first category because it offers the best combination of upside, testability, and fit with the current codebase.
+
+## Strategic Direction
+
+### Primary Recommendation
+
+Pursue objective-source event trading first.
+
+Meaning:
+
+- trade only markets whose resolution criteria map to an explicit, auditable source
+- detect source updates outside Polymarket
+- measure whether the market lags that source enough to permit a one-sided entry after costs
+- paper trade that edge before any authenticated execution work
+
+Why this is the best next move:
+
+- it targets a real edge source rather than a threshold artifact
+- it reuses the current streaming and replay infrastructure
+- it creates measurable research outputs even if the final answer is negative
+- it does not depend on winning a pure speed race across every market
+
+### Secondary Future Directions
+
+These remain worthwhile, but they should not be the next phase:
+
+1. Cross-market and negative-risk structure research
+   Good strategic fit with the current arbitrage mindset, but it depends on a broader market graph and more relationship logic than the current system has.
+
+2. Passive maker and incentive capture
+   More attractive than before because Polymarket now has liquidity rewards and daily maker rebates in eligible markets, but this path needs authenticated trading, quote management, and inventory controls that are too large for the immediate pivot.
+
+### Directions To Avoid Right Now
+
+- more threshold tuning on the current full-set arb path
+- broad, generic NLP news trading without explicit source discipline
+- sports taker automation as the first event domain
 
 ## Goals
 
-- Build a single event-driven core that supports both replay and live paper trading.
-- Focus only on curated binary Polymarket markets in the first version.
-- Use taker-only execution for both legs in the first version.
-- Detect, size, simulate, and track full-set arbitrage opportunities.
-- Model position lifecycle honestly enough that "risk-free" claims are only made for completed pairs with a valid realization path.
-- Produce artifacts that help answer whether the strategy is actually executable, not just theoretically attractive.
+- Reframe the project around evidence-driven edge discovery rather than one fixed hypothesis.
+- Keep the current recorder, replay, stream, and reporting code as shared infrastructure.
+- Build a repeatable research workflow for objective-source market trading.
+- Measure lead-lag between external source events and Polymarket repricing.
+- Paper trade one-sided entries with explicit exit assumptions.
+- Produce ranked market and source-type outputs that support later go or no-go decisions.
+- Preserve clean upgrade points for structural arbitrage, market making, and authenticated execution later.
 
 ## Non-Goals
 
-- Real-money execution
-- Maker orders
-- Cross-market or cross-event arbitrage
-- Negative-risk multi-outcome market strategies
-- Wallet-following or social-signal strategies
-- Hyperliquid integration in this spec
-- Fully automated market selection across the entire exchange
+- Real-money trading in the next phase
+- Generic "trade all breaking news" automation
+- Social-signal or wallet-following strategies
+- Immediate maker quoting and inventory warehousing
+- Immediate multi-venue expansion
+- Trying to rescue full-set arbitrage by threshold tuning alone
 
 ## Constraints And Assumptions
 
-- Venue: Polymarket only
-- Market type: binary `YES/NO` markets only
-- Initial market universe: curated allowlist of roughly 10-20 markets
-- Execution style: taker-only on both legs
-- Modes: replay backtesting and live paper trading from one shared core
-- Portfolio controls: included from day one
-- Paper trading is local simulation against live public market data, not real exchange execution
+- Venue remains Polymarket only.
+- The next phase should stay focused on binary `YES/NO` markets.
+- A market is eligible only if the resolution path is explicit enough to map to a trustworthy source.
+- Source timestamps must be auditable and preserved in artifacts.
+- Signals must be reproducible from saved raw source payloads plus normalized market events.
+- Entry and exit rules must be explicit; the system cannot quietly assume instant mark-to-market realization.
+- Sports markets are not a good first taker domain because marketable orders are delayed by 3 seconds and resting books are cleared at game start.
+- Most Polymarket markets remain fee-free; maker-rebate and liquidity-reward strategy work belongs in a later dedicated phase.
+- The project should prefer objective and machine-readable source domains over subjective or narrative markets.
 
-Important planning constraint:
+Important design constraint:
 
-- Polymarket documents public market discovery, current orderbooks, WebSocket streaming, fee flags, and historical price series.
-- The referenced public docs do not describe a historical full-depth orderbook replay endpoint.
-- Because of that, realistic execution backtesting must rely on captured orderbook snapshots and market events recorded by our own collector.
-- Historical price series can still be used for coarse research, sanity checks, and gap-filling, but not as the sole source for depth-aware taker-fill simulation.
+- the next phase must be able to produce a useful negative result
 
-This means the first implementation plan should treat market-data recording as a first-class part of the system, not a side utility.
+If the research shows that source updates do not create a repeatable tradable lag, the system should say so clearly rather than force a trading conclusion.
 
 ## Official References
 
-These sources ground the design in current Polymarket docs:
+These sources ground the design in current Polymarket docs as checked on 2026-03-20:
 
-- [Market Data Overview](https://docs.polymarket.com/market-data/overview)
+- [Markets & Events](https://docs.polymarket.com/concepts/markets-events)
 - [Orderbook](https://docs.polymarket.com/trading/orderbook)
 - [WebSocket Overview](https://docs.polymarket.com/market-data/websocket/overview)
-- [Get prices history](https://docs.polymarket.com/api-reference/markets/get-prices-history)
-- [Merge Tokens](https://docs.polymarket.com/trading/ctf/merge)
-- [Fees](https://docs.polymarket.com/trading/fees)
+- [Create Order](https://docs.polymarket.com/trading/orders/create)
+- [Order Lifecycle](https://docs.polymarket.com/concepts/order-lifecycle)
+- [Fees](https://docs.polymarket.com/polymarket-learn/trading/fees)
+- [Liquidity Rewards](https://docs.polymarket.com/market-makers/liquidity-rewards)
+- [Maker Rebates Program](https://docs.polymarket.com/market-makers/maker-rebates)
+- [Negative Risk Markets](https://docs.polymarket.com/developers/neg-risk/overview)
 
 ## Proposed Approach
 
-The recommended architecture is a unified event-driven core with separate input adapters for replay and live data.
-
-Why this approach:
-
-- It matches the desired learning path of backtesting first, then paper trading.
-- It keeps trade logic consistent between modes.
-- It reduces drift between "research code" and "live simulation code."
-- It forces execution assumptions to be explicit and testable.
-
-Alternatives considered and rejected:
-
-1. Separate backtest and live scripts with shared helpers
-   Faster to start, but likely to diverge quickly in fills, fees, and risk rules.
-
-2. Batch snapshot analyzer only
-   Useful for research, but too weak for realistic paper trading and portfolio lifecycle tracking.
-
-## System Overview
-
-The first version consists of the following major parts:
-
-1. Market catalog loader
-2. Market data recorder
-3. Replay adapter
-4. Live adapter
-5. Normalized market state store
-6. Opportunity engine
-7. Position-sizing engine
-8. Execution simulator
-9. Inventory lifecycle engine
-10. Portfolio and risk manager
-11. Reporting and artifact writers
+The recommended architecture is to keep the current event-driven market core and add a source-aware research layer above it.
 
 High-level flow:
 
-`Gamma market metadata + CLOB orderbooks/WebSocket + recorded snapshots -> normalized events -> opportunity engine -> execution simulator -> portfolio ledger -> run artifacts`
+`Gamma metadata + Polymarket market stream + external objective sources -> normalized market events + normalized source events -> lead-lag analyzer -> signal evaluator -> one-sided paper execution -> ranked research artifacts`
 
-## Core Components
+Why this approach:
 
-### 1. Market Catalog Loader
+- it keeps the proven infrastructure
+- it makes the edge hypothesis explicit and testable
+- it narrows the market universe before deeper execution work
+- it creates reusable building blocks for later structure-arb and maker strategies
+
+Alternatives considered and rejected for the next phase:
+
+1. Keep optimizing full-set arbitrage
+   Rejected because the latest live study showed no raw edge in the tested universe. Better accounting will improve truthfulness, not create profit.
+
+2. Jump directly to maker quoting
+   Rejected as the immediate next phase because it requires authentication, order management, queue risk, inventory management, and reward-aware pricing before the project has a validated edge thesis for where to quote.
+
+3. Build a generic news or NLP trader
+   Rejected because it invites ambiguity, irreproducible signals, and poor post-mortem quality. The project should earn complexity only after succeeding on objective-source domains first.
+
+## System Overview
+
+The platform is now best understood as three layers:
+
+1. Shared market-data and replay infrastructure
+2. Strategy research modules
+3. Execution and operational modules
+
+### 1. Shared Infrastructure
+
+This is the reusable core that already exists in some form and should remain strategy-agnostic:
+
+- market catalog loading
+- metadata refresh
+- live market-data adapters
+- recording and replay
+- normalized state store
+- artifact writing
+- feed-health and latency instrumentation
+
+### 2. Strategy Research Modules
+
+These are the edge-specific layers that sit on top of the shared core:
+
+- full-set arbitrage study tools
+- market-quality ranking
+- objective-source event research
+- later, structure-arb research
+- later, maker/reward research
+
+### 3. Execution And Operations
+
+These layers should stay behind research until a strategy is validated:
+
+- one-sided paper execution and exit accounting
+- authenticated order entry
+- user-channel state reconciliation
+- runtime kill switches
+- alerts, reconnect, and deployment controls
+
+## Detailed Next Phase: Phase 2.3 Objective-Source Event Research
+
+### Purpose
+
+Determine whether Polymarket markets tied to explicit external sources exhibit a repeatable lag between source updates and market repricing that is large enough to support one-sided paper trading after costs and depth constraints.
+
+### Core Research Question
+
+For a market with a clear resolution source, when the source emits a state change that should move fair value, does Polymarket's order book lag long enough to create an executable entry?
+
+The answer must be measurable through saved artifacts, not intuition.
+
+### Scope
+
+This phase covers:
+
+- broader candidate-market discovery
+- source-aware market metadata
+- external source ingestion
+- source-to-market mapping
+- lead-lag measurement
+- one-sided event-driven paper entries and exits
+- ranked research outputs
+
+This phase does not cover:
+
+- authenticated live trading
+- passive maker quoting
+- generic unstructured news ingestion
+- multi-market structural baskets
+- automatic production deployment
+
+### Market Eligibility Rules
+
+A market is eligible for Phase 2.3 only if all of the following hold:
+
+- the market is binary and orderbook-enabled
+- the resolution rule is explicit enough to identify a canonical source
+- the source update can be timestamped precisely enough for lag analysis
+- the mapping from source event to expected `YES` or `NO` move is deterministic enough to audit
+- the market is not in a domain with mechanics that invalidate the intended entry style
+
+Early inclusion categories:
+
+- official filings or notices
+- exchange or protocol status pages
+- onchain contract events with canonical indexing
+- scheduled numeric releases from official publishers
+
+Early exclusion categories:
+
+- narrative politics with ambiguous timing
+- celebrity or rumor-driven markets
+- sports taker trading
+- markets whose resolution depends on subjective interpretation across many sources
+
+### Deliverables
+
+By the end of Phase 2.3, the system should produce:
+
+- an expanded candidate market catalog with source metadata
+- a source registry that maps markets to parsers and confidence rules
+- normalized source-event artifacts with raw payload retention
+- market response studies that measure lag, size, and price reaction
+- one-sided paper-trading artifacts for accepted and rejected signals
+- ranked market and source-type summaries for later selection
+
+### Core Components
+
+### 1. Candidate Market Expansion And Metadata Enrichment
 
 Purpose:
 
-- Load the user-maintained allowlist of markets to watch.
-- Resolve the paired `YES` and `NO` token IDs for each binary market.
-- Persist market metadata needed for filtering and reporting.
+- expand the market universe beyond the current handpicked allowlist
+- capture the metadata required to determine whether a market is source-eligible
 
 Responsibilities:
 
-- Pull market metadata from Polymarket discovery endpoints.
-- Validate that each configured market is binary and orderbook-enabled.
-- Track fields such as:
-  - event slug
-  - market question
-  - condition ID
-  - `YES` token ID
-  - `NO` token ID
-  - market status
-  - `feesEnabled` or equivalent fee metadata
+- ingest a broader set of active markets from Gamma
+- store category, end date, status, fee flags, event slug, question text, and resolution text
+- attach preliminary tags such as `objective_source_candidate`, `sports`, `crypto`, `ambiguous_resolution`, or `manual_review_required`
+- support ranking and filtering before any trading logic runs
 
-Out of scope:
+This component should answer:
 
-- Automated discovery and ranking of all active markets
+- which markets are even candidates for objective-source research
 
-### 2. Market Data Recorder
+### 2. Resolution And Source Registry
 
 Purpose:
 
-- Record the raw data needed to replay realistic market conditions later.
+- hold the authoritative mapping from market to external source and signal logic
 
 Responsibilities:
 
-- Subscribe to live market data for the curated allowlist.
-- Persist normalized orderbook snapshots and price updates with timestamps.
-- For v1, record the ask-side ladder needed for taker simulation on both `YES` and `NO`, rather than trying to capture every possible market microstructure detail.
-- Write replayable artifacts in a format suitable for deterministic historical simulation.
+- define the source type, source URL or endpoint, parser identifier, and confidence rules for each tracked market
+- encode whether a source event implies a `YES` move, a `NO` move, or a terminal outcome
+- record invalidation rules such as ambiguous wording, missing official publication time, or multi-source dependencies
+- keep human-maintained overrides explicit rather than hidden inside code
 
-Minimum replay requirement:
+This registry is the heart of the phase. If the mapping is weak, the strategy is weak.
 
-- The recorder must preserve enough information to reconstruct the visible paired ask depth seen by the strategy at decision time.
-- The implementation plan should prefer normalized update events plus periodic snapshots over a loose collection of ad hoc CSV exports.
-
-This component matters because replay quality depends on recorded depth and timing, not just end-of-minute price history.
-
-### 3. Replay Adapter
+### 3. External Source Adapters
 
 Purpose:
 
-- Feed recorded historical events into the shared trading core.
+- ingest objective external updates in a normalized and replayable format
 
 Responsibilities:
 
-- Read captured snapshot files in timestamp order.
-- Reconstruct market-state updates deterministically.
-- Expose replay controls such as start time, end time, speed, and selected markets.
+- poll or subscribe to approved external sources
+- persist raw payloads with local receipt timestamps
+- parse normalized source events with source-side timestamps when available
+- classify parse failures, source downtime, and stale-source conditions
+- support replay from captured source artifacts
 
-### 4. Live Adapter
+The system should start with a small number of source families rather than a giant adapter zoo.
+
+### 4. Lead-Lag And Market Response Tracker
 
 Purpose:
 
-- Feed current public market data into the same trading core used by replay.
+- measure how Polymarket responds after a source event
 
 Responsibilities:
 
-- Connect to relevant market-data endpoints and streams.
-- Translate external payloads into internal normalized events.
-- Maintain connection health, reconnection behavior, and data freshness signaling.
+- align normalized source events with Polymarket order-book state
+- capture pre-event and post-event price and depth snapshots
+- compute lag metrics such as:
+  - time to first visible move
+  - time to threshold crossing
+  - best executable entry within a response window
+  - maximum favorable move
+  - time until edge disappears
+- distinguish between "source was early" and "market was already priced"
 
-### 5. Normalized Market State Store
+This component is the main research engine for deciding whether a source class is promising.
+
+### 5. Signal Evaluator
 
 Purpose:
 
-- Maintain the latest usable state for each `YES` and `NO` book.
+- decide whether a given source event warrants a one-sided paper trade
+
+Entry logic should require all of the following:
+
+- source confidence passes the configured threshold
+- mapping from source event to market direction is unambiguous
+- market is open, active, and not too close to resolution or halt conditions
+- visible size and expected depth support the intended entry
+- expected edge after fees, slippage, and operational buffer clears the configured minimum
+- the signal has not already become stale because the market fully repriced
+
+The evaluator should emit both:
+
+- accepted signals
+- rejected signals with explicit reasons
+
+### 6. One-Sided Paper Execution And Exit Lifecycle
+
+Purpose:
+
+- simulate what would have happened if the bot had acted on an accepted source event
 
 Responsibilities:
 
-- Store best ask, visible ask depth, timestamp, tick size, and freshness state.
-- Keep paired `YES` and `NO` state aligned under one logical market view.
-- Mark markets unusable if data is stale, incomplete, or inconsistent.
+- enter a directional `YES` or `NO` position using configured marketable execution assumptions
+- model depth-aware entry price and slippage
+- support explicit exit modes:
+  - exit on repricing target
+  - exit on time stop
+  - hold to resolution when the source event is effectively terminal
+- track capital lock-up and exit uncertainty honestly
+- classify late entries, partial exits, and stale exits separately from successful trades
 
-### 6. Opportunity Engine
+This is intentionally still paper-only, but it must be honest enough to support later go or no-go decisions.
 
-Purpose:
-
-- Decide when an observed market state is worth attempting.
-
-Core calculation:
-
-`yes_ask + no_ask + estimated_fees + estimated_slippage + operational_buffer < 1.00`
-
-Rules:
-
-- A raw alert may be emitted when top-of-book price sum drops below a configurable threshold such as `0.99`.
-- Actual executable opportunities must be evaluated net of costs and based on available size on both sides.
-- Markets with ambiguous fee configuration, stale data, or insufficient paired depth are rejected.
-
-The engine should emit both:
-
-- accepted opportunities
-- rejected opportunities with explicit reasons
-
-Rejected-opportunity logging is important for learning why social-media "free money" examples are often not executable.
-
-### 7. Position-Sizing Engine
+### 7. Research Artifacts And Ranking
 
 Purpose:
 
-- Convert an opportunity into a safe paired order size.
-
-Inputs:
-
-- visible paired ask depth
-- available cash
-- per-market cap
-- total capital cap
-- open inventory count
-- minimum order size
-
-Responsibilities:
-
-- Compute the largest paired size that stays within all risk limits.
-- Refuse trades that only clear thresholds at uneconomically small size.
-- Avoid capital concentration in a single market.
-
-### 8. Execution Simulator
-
-Purpose:
-
-- Model taker-only execution on both sides of the binary pair.
-
-Behavior:
-
-- Consume ask liquidity from the top of book outward.
-- Apply size-aware fill pricing rather than assuming infinite liquidity at the best ask.
-- Model one of two outcomes:
-  - full paired execution
-  - partial or broken execution
-
-Default operating mode:
-
-- `strict paired mode`
-- A trade is counted as successful only if both legs can be fully simulated within the same accepted market state snapshot.
-
-Secondary diagnostic mode:
-
-- `degraded mode`
-- Partial fills are allowed for research, but they are classified separately as execution failures or broken-pair inventory.
-
-The first implementation plan should default to strict paired mode and keep degraded mode available for later diagnostics.
-
-### 9. Inventory Lifecycle Engine
-
-Purpose:
-
-- Track how a completed pair becomes realized PnL.
-
-Responsibilities:
-
-- Create inventory lots for every completed `YES + NO` pair.
-- Track entry timestamp, average cost, expected payout, expected fees, and lifecycle state.
-- Support the two conceptual realization paths:
-  - merge back to collateral
-  - hold through resolution
-
-Default v1 accounting rule:
-
-- The first implementation should treat completed pairs as realized only at modeled market resolution, paying out `1.00` per completed pair.
-- Merge should be represented as a documented extension point or secondary accounting mode, not as required v1 functionality.
-
-The first version does not need real onchain merge execution, but it must model the accounting path honestly enough that realized PnL is not booked immediately at entry.
-
-### 10. Portfolio And Risk Manager
-
-Purpose:
-
-- Enforce hard constraints at run time.
-
-Required controls:
-
-- max capital per market
-- max total deployed capital
-- max concurrent paired lots
-- max broken-pair exposure
-- cooldown after execution in the same market
-- stale-data rejection
-
-Responsibilities:
-
-- Maintain free cash, locked cash, open lots, broken-pair exposure, and cumulative fees.
-- Prevent the simulator from entering trades that look good individually but overextend the account.
-
-### 11. Reporting And Artifact Writers
-
-Purpose:
-
-- Produce outputs that are useful for learning, debugging, and later planning.
+- make Phase 2.3 useful even when many markets fail
 
 Required outputs:
 
-- backtest summary
-- live paper-trading session summary
-- detailed trade log
-- rejected-opportunity log
-- inventory ledger
-- portfolio time series
-- machine-readable JSON or CSV artifacts for analysis
+- run summary
+- enriched market catalog snapshot
+- source event log
+- signal decision log
+- trade log
+- rejection log
+- per-market response summary
+- per-source-type ranking summary
+- feed-health and source-health counters
+
+The ranking should prioritize:
+
+- repeatable lead-lag
+- executable size
+- post-cost edge
+- signal clarity
+- operational reliability of the source
 
 ## Data Model
 
-The implementation plan should define stable, small contracts for the following records:
+The next implementation plan should define stable contracts for at least the following records.
 
-### Market Catalog Entry
+### Enriched Market Entry
 
-- logical market identifier
-- event slug or event identifier
+- market identifier
+- event slug
 - question text
-- condition ID
-- `YES` token ID
-- `NO` token ID
+- category or tags
+- end date
 - fee metadata
-- status metadata
+- resolution text
+- eligibility status
+- source registry key
 
-### Market State
+### Source Event
+
+- source event identifier
+- source type
+- source URL or origin
+- source-side timestamp if present
+- local receipt timestamp
+- normalized event payload
+- raw payload reference
+- parse confidence
+- affected market identifiers
+
+### Market Response Window
 
 - market identifier
-- side (`YES` or `NO`)
-- best ask
-- ask depth ladder
-- timestamp
-- tick size
-- minimum order size
-- freshness flag
+- linked source event identifier
+- pre-event best bid and ask
+- pre-event depth snapshot
+- first market move timestamp
+- best executable entry seen in the configured window
+- best favorable move after entry
+- time to repricing
+- final classification
 
-### Opportunity Record
+### Signal Decision
 
 - market identifier
-- observed `YES` ask
-- observed `NO` ask
-- gross combined cost
-- estimated fees
-- estimated slippage
-- operational buffer
-- net estimated cost
-- executable paired size
+- source event identifier
+- direction (`YES` or `NO`)
+- estimated fair-value shift or trigger class
+- expected entry price
+- expected edge after costs
 - decision outcome
 - rejection reason if applicable
 
-### Paper Trade Record
+### Directional Paper Trade
 
-- run ID
+- run identifier
 - market identifier
-- attempt timestamp
-- requested paired size
-- filled `YES` size and price
-- filled `NO` size and price
-- fee estimate
-- success or failure classification
+- source event identifier
+- direction
+- entry timestamp
+- entry price and size
+- exit mode
+- exit timestamp
+- exit price
+- realized or modeled PnL
+- lifecycle classification
 
-### Inventory Lot
+## CLI And Workflow Expectations
 
-- lot ID
-- market identifier
-- paired size
-- total cost basis
-- expected payout
-- lifecycle state
-- realized PnL when complete
+The next implementation plan should add dedicated research commands rather than overloading the original arbitrage commands.
 
-### Portfolio State
+Expected workflow:
 
-- run ID
-- timestamp
-- free cash
-- locked cash
-- cumulative fees
-- open paired lots
-- broken-pair exposure
-- realized PnL
-- unrealized PnL
+1. refresh and enrich a broader market catalog
+2. build or update the source registry
+3. record or ingest source events alongside market events
+4. run lead-lag studies over a configured universe
+5. run one-sided paper simulations on accepted signals
+6. produce ranked outputs for shortlist creation
 
-## Modes
+Likely command shape:
 
-### Replay Backtesting Mode
+- catalog expansion and enrichment command
+- source-event study command
+- event-paper command
+- replay analysis command for recorded source plus market runs
 
-Purpose:
+Exact command names can be finalized in the implementation plan.
 
-- Evaluate how the strategy would have behaved on recorded data.
+## Entry, Exit, And Risk Rules
 
-Inputs:
+### Entry Rules
 
-- recorded market events
-- market allowlist
-- strategy thresholds
-- risk parameters
+The next phase should be conservative by default:
 
-Outputs:
+- no trade without a clear source mapping
+- no trade if the market already fully repriced
+- no trade if visible depth is too small
+- no trade in the final moments before resolution unless explicitly supported by the source model
+- no averaging down
 
-- run summary
-- event-by-event decisions
-- trade and inventory logs
+### Exit Rules
 
-### Live Paper-Trading Mode
+Each strategy configuration must choose one of these explicitly:
 
-Purpose:
+- target repricing exit
+- time-based exit
+- hold to resolution
 
-- Run the same decision logic on current public data without sending real orders.
+The artifact set must record which exit logic was used so later comparisons remain honest.
 
-Inputs:
+### Required Risk Controls
 
-- live public market data streams
-- market allowlist
-- strategy thresholds
-- risk parameters
-
-Outputs:
-
-- live decision stream
-- simulated trade attempts
-- session summary
-- operational logs
-
-The live mode is not a substitute for real execution, but it is the correct intermediate step before using real capital.
-
-## Opportunity Detection And Entry Rules
-
-The first version should make a hard distinction between:
-
-- a market mispricing signal
-- an actually executable arbitrage
-
-Signal threshold:
-
-- configured alert when `YES ask + NO ask` drops below a raw threshold
-
-Execution threshold:
-
-- only execute when the estimated net cost remains below `1.00` after fees, slippage, and operational buffer
-
-Additional entry conditions:
-
-- market is in curated allowlist
-- both sides are fresh
-- both sides have enough visible ask size
-- position size is above minimum order size
-- portfolio caps are not breached
+- max capital per market
+- max capital per source family
+- max concurrent directional positions
+- stale-source rejection
+- stale-market rejection
+- ambiguity kill switch
+- cooldown after a source event for the same market
+- hard disable for unsupported categories
 
 ## Error Handling And Failure Classification
 
-The bot should classify failures rather than collapsing them into generic "missed trade" outcomes.
+Phase 2.3 should classify failures rather than folding them into generic "missed trade" buckets.
 
 Required classifications:
 
-- stale market data
-- missing paired book
-- insufficient depth
-- threshold not met after fees
-- threshold not met after slippage
-- per-market cap exceeded
-- total capital cap exceeded
-- broken-pair execution
-- invalid market metadata
-- feed disconnect or replay corruption
-
-This classification layer is important because it will show whether the idea fails because the strategy is bad or because the market-data and execution assumptions are weak.
+- ambiguous source mapping
+- parser failure
+- source unavailable
+- source stale
+- market already repriced
+- insufficient entry depth
+- insufficient exit depth
+- market closed, halted, or resolved
+- fee or tick-size mismatch
+- signal conflict across sources
+- replay corruption or missing source artifact
 
 ## Testing Strategy
 
-The implementation plan should include tests for:
+The next implementation plan should include:
 
 ### Unit Tests
 
-- opportunity-cost calculations
-- fee handling
-- slippage estimation
-- position sizing
-- portfolio cap enforcement
+- source parser normalization
+- source-to-market mapping
+- signal evaluation thresholds
+- lead-lag metric calculation
+- entry and exit accounting
 
 ### Deterministic Replay Tests
 
-- identical recorded inputs produce identical outputs
-- market transitions from valid to invalid opportunity are handled predictably
-- stale-data flags prevent entry
+- identical source plus market artifacts produce identical signal decisions
+- the same source event cannot trigger duplicate entries without an explicit policy
+- stale-source and stale-market gating behaves predictably
 
 ### Failure-Mode Tests
 
-- one leg available, other leg unavailable
-- one leg fully fills, the other partially fills
-- market fee metadata changes behavior
-- tiny visible edge disappears after costs
+- official source payload arrives but does not parse
+- source event is valid but the market already moved
+- direction mapping is ambiguous and the signal is rejected
+- exit liquidity is too thin to realize the paper result cleanly
 
 ### Acceptance Scenarios
 
-- a simple recorded market produces at least one accepted trade
-- a simple recorded market produces only rejected trades with correct reasons
-- live paper mode emits the same opportunity decision as replay when fed the same normalized events
+- one objective-source market produces an accepted signal and a profitable paper exit
+- one market produces only rejected signals with correct reasons
+- one market shows no measurable lag and is classified as unpromising
 
-## Success Criteria For This Spec
+## Success Criteria For Phase 2.3
 
-The first implementation should be considered successful if it can:
+Phase 2.3 should be considered successful if it can:
 
-- replay recorded Polymarket market data for a curated allowlist
-- run the same arbitrage logic in replay and live paper modes
-- produce deterministic opportunity and trade decisions
-- simulate paired taker entries with explicit cost modeling
-- track inventory and portfolio constraints honestly
-- emit artifacts that are strong enough to support a later go or no-go decision for small live deployment
+- identify a non-trivial set of objective-source candidate markets
+- ingest and replay external source events alongside Polymarket market data
+- measure lead-lag and executable depth in a repeatable way
+- produce honest one-sided paper-trading artifacts
+- rank markets and source classes by observed post-cost edge quality
+- make it obvious whether event-driven trading deserves further investment
 
-## Risks And Planning Notes
+Important success condition:
 
-These are not blockers, but they must shape the implementation plan:
+- a defensible negative result is still a successful phase outcome
 
-1. Historical realism depends on recorded depth, not just prices.
-2. Paper trading can only simulate live execution quality, not prove it.
-3. Public orderbooks may change between observed updates, so even strict paired simulation remains an approximation.
-4. Fee treatment must be explicit because some markets have fees enabled.
-5. A greenfield workspace means the plan should include project scaffolding, configuration, and artifact layout from scratch.
+If Phase 2.3 shows no repeatable source-led edge, that is valuable evidence and should redirect the project toward structural arbitrage or passive maker research instead of wasting more effort.
 
-## Future Phases
+## Future Phase Roadmap
 
-This section captures the intended expansion path so v1 is built with clean upgrade points.
+These phases are intentionally high level. Only Phase 2.3 is detailed in this document.
 
-### Phase 0: Data Capture Foundation
+### Phase 2.4: Event Execution Realism And Exit Accounting
 
-- Add a durable recorder for curated market snapshots and market events.
-- Build a small labeled replay corpus.
-- Validate replay fidelity before trusting backtest results.
+- improve one-sided fill realism
+- model partial exits and holding costs more honestly
+- refine lifecycle accounting for hold-to-resolution positions
+- add deeper rejection and slippage diagnostics
 
-### Phase 1: Shared Replay And Live Paper Core
+### Phase 3: Structural Relationship Research
 
-- Implement the v1 architecture in this spec.
-- Support curated binary markets only.
-- Keep execution taker-only and simulated.
+- expand from single-market event trading into cross-market relationships
+- scan for logical inconsistencies across mutually exclusive or linked markets
+- add negative-risk and basket-style research where market structure supports it
 
-### Phase 2: Execution Realism And Research Tooling
+### Phase 4: Passive Maker And Incentive Research
 
-- Add richer diagnostics for partial fills and broken pairs.
-- Improve reporting, dashboards, and parameter sweeps.
-- Add better market-selection heuristics for the curated universe.
+- study fee-enabled markets with maker rebates
+- study liquidity-reward-adjusted profitability for passive quoting
+- build quote-quality, inventory, and reward-scoring analytics before any live maker deployment
 
-### Phase 3: Small Live Trading With Hard Safety Rails
+### Phase 5: Authenticated Execution And Safety Rails
 
-- Add authenticated order placement.
-- Start with tiny capital and strong kill switches.
-- Require manual review of paper-trading results before enabling live mode.
-- Keep strict per-market and total-capital limits.
+- add authenticated order entry, cancels, and user-stream reconciliation
+- implement hard kill switches, exposure controls, and audit logs
+- require strategy-specific readiness gates before enabling live orders
 
-### Phase 4: Broader Strategy Expansion
+### Phase 6: Small-Capital Live Rollout
 
-- Expand to larger market universes once the binary full-set bot is reliable.
-- Add more nuanced execution tactics.
-- Explore whether the architecture should generalize to other venues, including Hyperliquid, without compromising clarity in the Polymarket path.
+- deploy only strategies that already survived replay and paper research
+- start with tiny size
+- require manual oversight, alerting, reconnect hardening, and daily review artifacts
 
-## Out Of Scope For Planning Handoff
+### Phase 7: Multi-Strategy Portfolio Layer
 
-This spec is ready to hand off to an implementation-planning step focused on the first phase of actual build work. The next planning document should break the v1 architecture into sequenced implementation tasks, but it should not yet plan real-money execution.
+- allocate capital across validated strategy families
+- compare event-driven, structural, and passive-maker books on a common reporting basis
+- rotate markets and source families based on measured performance and operational quality
+
+## Planning Handoff
+
+This spec is ready to hand off to an implementation-planning step focused on Phase 2.3 only.
+
+The next plan should:
+
+- treat the current recorder and replay stack as foundational
+- avoid authenticated trading work
+- keep the initial source universe small and auditable
+- produce concrete tasks for metadata enrichment, source ingestion, lead-lag analysis, directional paper trading, and ranked artifacts
+
+Later phases should remain high-level until Phase 2.3 produces evidence worth building on.
