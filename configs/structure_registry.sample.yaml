@@ -1,0 +1,11 @@
+relationships:
+  - key: election-basket
+    relationship_type: mutually_exclusive_yes
+    market_slugs:
+      - market-one
+      - market-two
+  - key: candidate-implies-party
+    relationship_type: implies_yes
+    market_slugs:
+      - candidate-market
+      - party-market

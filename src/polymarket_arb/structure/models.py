@@ -13,3 +13,7 @@ class StructureOpportunity(BaseModel):
     raw_gap_bps: float
     net_gap_bps: float
     executable_size: float
+
+
+class ResolvedStructureDefinition(StructureDefinition):
+    market_ids: list[str]
