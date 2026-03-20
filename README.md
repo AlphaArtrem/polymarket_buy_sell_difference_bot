@@ -13,6 +13,9 @@ PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli bench-latency --config-pat
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli record-live --config-path configs/markets.sample.yaml --run-dir artifacts/live-capture --duration-seconds 10 --mode stream
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli study-live-opportunities --config-path configs/markets.research.yaml --output-dir artifacts/market-study --duration-seconds 300 --mode stream
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli analyze-recording --config-path configs/markets.research.yaml --run-dir artifacts/live-capture --output-dir artifacts/replay-study
+PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli catalog-expand --config-path configs/event_research.sample.yaml --output-path artifacts/event-catalog.json
+PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli study-source-lag --config-path configs/event_research.sample.yaml --output-dir artifacts/source-lag --source-payload-path tests/fixtures/sources/objective_update.json
+PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli run-event-paper --config-path configs/event_research.sample.yaml --output-dir artifacts/event-paper --source-payload-path tests/fixtures/sources/objective_update.json
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli run-paper --config-path configs/markets.sample.yaml --output-dir artifacts/paper-report --duration-seconds 10 --mode stream
 PYTHONPATH=src .venv/bin/python -m polymarket_arb.cli run-replay --config-path configs/markets.sample.yaml --run-dir artifacts/demo-run --output-dir artifacts/demo-report
 ```
@@ -39,3 +42,19 @@ Interpret the market classes conservatively:
 - `drop`: too quiet, no post-cost edge, or observed edge is too small or too brief
 
 The sample configs now include `api.market_ws_url`, `runtime.mode`, and `research` thresholds so the same repo can support low-latency stream studies on the VPS and simpler local experimentation.
+
+## Phase 2.3 Replay Workflow
+
+Use the Phase 2.3 workflow when a market has an explicit external source and you want replayable source-to-market research instead of a live stream study.
+
+1. Run `catalog-expand` to snapshot a broader candidate universe with resolution text and source-candidate tags.
+2. Maintain the market-to-source mapping in `configs/source_registry.sample.yaml` or a copy of it next to your config.
+3. Run `study-source-lag` with a replayable JSON source payload to write `event_lag_summary.json` and `event_rankings.json`.
+4. Run `run-event-paper` against the same source payload to write `summary.json` and `trade_log.json`.
+
+Phase 2.3 artifacts:
+
+- `event_lag_summary.json`: per-market source-event lag and entry-edge measurements
+- `event_rankings.json`: ranked candidate markets weighted toward repeatable source edge
+- `summary.json`: run-level event-paper counts and cash/deployment state
+- `trade_log.json`: accepted event-paper trades with direction, size, entry price, and timestamp

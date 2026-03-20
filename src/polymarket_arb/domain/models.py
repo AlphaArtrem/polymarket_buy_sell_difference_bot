@@ -19,6 +19,23 @@ class MarketCatalogEntry(BaseModel):
     active: bool = True
 
 
+class EnrichedMarketEntry(MarketCatalogEntry):
+    category: str | None = None
+    end_date_iso: str | None = None
+    resolution_text: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    source_registry_key: str | None = None
+
+
+class SourceEventRecord(BaseModel):
+    source_event_id: str
+    source_type: str
+    source_key: str
+    received_timestamp_ms: int
+    normalized_payload: dict[str, object]
+    affected_market_ids: list[str] = Field(default_factory=list)
+
+
 class OrderBookSnapshot(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

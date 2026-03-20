@@ -120,3 +120,42 @@ def test_load_settings_reads_research_thresholds(tmp_path: Path) -> None:
     assert settings.research.keep_min_best_net_edge_bps == 15
     assert settings.research.watch_min_post_cost_opportunities_per_minute == 0.2
     assert settings.research.low_sample_paired_snapshot_floor == 5
+
+
+def test_load_settings_reads_event_research_settings(tmp_path: Path) -> None:
+    config_path = tmp_path / "event.yaml"
+    config_path.write_text(
+        dedent(
+            """
+            venue: polymarket
+            api:
+              gamma_base_url: https://gamma-api.polymarket.com
+              clob_base_url: https://clob.polymarket.com
+              poll_interval_ms: 500
+            event_research:
+              candidate_market_limit: 200
+              source_registry_path: configs/source_registry.sample.yaml
+              response_window_seconds: 120
+              max_signal_age_seconds: 15
+              min_expected_edge_bps: 25
+              default_exit_mode: repricing_target
+            markets:
+              - slug: market-one
+                max_capital_usd: 50
+            strategy:
+              raw_alert_threshold: 0.99
+              fee_rate: 0.0
+              slippage_buffer: 0.0
+              operational_buffer: 0.0
+              stale_after_ms: 5000
+            portfolio:
+              starting_cash_usd: 500
+              max_total_deployed_usd: 200
+            """
+        ).strip()
+    )
+
+    settings = load_settings(config_path)
+
+    assert settings.event_research.candidate_market_limit == 200
+    assert settings.event_research.default_exit_mode == "repricing_target"
