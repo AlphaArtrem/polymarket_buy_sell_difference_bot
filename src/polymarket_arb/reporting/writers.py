@@ -1,3 +1,4 @@
+from dataclasses import asdict, is_dataclass
 import json
 from pathlib import Path
 from typing import Any, Dict
@@ -8,6 +9,8 @@ from polymarket_arb.domain.models import MarketCatalogEntry
 def _serialize_payload(payload: Any) -> Any:
     if hasattr(payload, "model_dump"):
         return payload.model_dump()
+    if is_dataclass(payload):
+        return asdict(payload)
     if isinstance(payload, list):
         return [_serialize_payload(item) for item in payload]
     if isinstance(payload, dict):
@@ -89,3 +92,27 @@ def write_trade_log(output_dir: Path, payload: Any) -> Path:
     data = _serialize_payload(payload)
     trade_log_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return trade_log_path
+
+
+def write_rejection_log(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    rejection_log_path = output_dir / "rejections.json"
+    data = _serialize_payload(payload)
+    rejection_log_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return rejection_log_path
+
+
+def write_exit_log(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    exit_log_path = output_dir / "exit_log.json"
+    data = _serialize_payload(payload)
+    exit_log_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return exit_log_path
+
+
+def write_open_positions(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    open_positions_path = output_dir / "open_positions.json"
+    data = _serialize_payload(payload)
+    open_positions_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return open_positions_path

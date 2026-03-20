@@ -56,6 +56,10 @@ class EventResearchSettings(BaseModel):
     max_signal_age_seconds: int = Field(gt=0, default=15)
     min_expected_edge_bps: float = Field(ge=0, default=25)
     default_exit_mode: str = "repricing_target"
+    repricing_target_bps: float = Field(ge=0, default=50)
+    max_holding_seconds: int = Field(gt=0, default=900)
+    exit_slippage_buffer: float = Field(ge=0, lt=1, default=0.01)
+    allow_hold_to_resolution: bool = False
 
 
 class Settings(BaseModel):
