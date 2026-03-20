@@ -81,3 +81,11 @@ def write_event_rankings(output_dir: Path, payload: Any) -> Path:
     data = _serialize_payload(payload)
     report_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return report_path
+
+
+def write_trade_log(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    trade_log_path = output_dir / "trade_log.json"
+    data = _serialize_payload(payload)
+    trade_log_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return trade_log_path

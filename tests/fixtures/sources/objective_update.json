@@ -1,0 +1,10 @@
+{
+  "status": "filed",
+  "timestamp": "2026-03-20T10:00:00Z",
+  "received_timestamp_ms": 1742464800000,
+  "market_timestamp_ms": 1742464805000,
+  "best_yes_ask": 0.42,
+  "best_no_ask": 0.6,
+  "yes_size": 10,
+  "no_size": 8
+}
