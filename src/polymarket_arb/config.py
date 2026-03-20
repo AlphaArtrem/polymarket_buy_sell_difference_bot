@@ -62,6 +62,13 @@ class EventResearchSettings(BaseModel):
     allow_hold_to_resolution: bool = False
 
 
+class StructureResearchSettings(BaseModel):
+    relationship_registry_path: str = "configs/structure_registry.sample.yaml"
+    min_raw_gap_bps: float = Field(ge=0, default=25)
+    min_net_gap_bps: float = Field(ge=0, default=10)
+    min_executable_size: float = Field(gt=0, default=1)
+
+
 class Settings(BaseModel):
     venue: str
     api: ApiSettings
@@ -71,6 +78,7 @@ class Settings(BaseModel):
     runtime: RuntimeSettings = RuntimeSettings()
     research: ResearchSettings = ResearchSettings()
     event_research: EventResearchSettings = EventResearchSettings()
+    structure_research: StructureResearchSettings = StructureResearchSettings()
 
 
 def load_settings(path: Path) -> Settings:

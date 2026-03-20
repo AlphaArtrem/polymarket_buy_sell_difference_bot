@@ -202,3 +202,40 @@ def test_load_settings_reads_event_execution_controls(tmp_path: Path) -> None:
 
     assert settings.event_research.repricing_target_bps == 50
     assert settings.event_research.allow_hold_to_resolution is True
+
+
+def test_load_settings_reads_structure_research_settings(tmp_path: Path) -> None:
+    config_path = tmp_path / "structure.yaml"
+    config_path.write_text(
+        dedent(
+            """
+            venue: polymarket
+            api:
+              gamma_base_url: https://gamma-api.polymarket.com
+              clob_base_url: https://clob.polymarket.com
+              poll_interval_ms: 500
+            structure_research:
+              relationship_registry_path: configs/structure_registry.sample.yaml
+              min_raw_gap_bps: 25
+              min_net_gap_bps: 10
+              min_executable_size: 5
+            markets:
+              - slug: market-one
+                max_capital_usd: 50
+            strategy:
+              raw_alert_threshold: 0.99
+              fee_rate: 0.0
+              slippage_buffer: 0.0
+              operational_buffer: 0.0
+              stale_after_ms: 5000
+            portfolio:
+              starting_cash_usd: 500
+              max_total_deployed_usd: 200
+            """
+        ).strip()
+    )
+
+    settings = load_settings(config_path)
+
+    assert settings.structure_research.min_raw_gap_bps == 25
+    assert settings.structure_research.min_executable_size == 5
