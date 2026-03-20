@@ -5,6 +5,16 @@ from typing import Any, Dict
 from polymarket_arb.domain.models import MarketCatalogEntry
 
 
+def _serialize_payload(payload: Any) -> Any:
+    if hasattr(payload, "model_dump"):
+        return payload.model_dump()
+    if isinstance(payload, list):
+        return [_serialize_payload(item) for item in payload]
+    if isinstance(payload, dict):
+        return {key: _serialize_payload(value) for key, value in payload.items()}
+    return payload
+
+
 def write_run_summary(output_dir: Path, summary: Dict[str, Any]) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = output_dir / "summary.json"
@@ -36,10 +46,7 @@ def write_feed_health(output_path: Path, payload: Dict[str, Any]) -> Path:
 def write_opportunity_summary(output_dir: Path, payload: Any) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = output_dir / "opportunity_summary.json"
-    if hasattr(payload, "model_dump"):
-        data = payload.model_dump()
-    else:
-        data = payload
+    data = _serialize_payload(payload)
     summary_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return summary_path
 
@@ -47,10 +54,7 @@ def write_opportunity_summary(output_dir: Path, payload: Any) -> Path:
 def write_market_quality_summary(output_dir: Path, payload: Any) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = output_dir / "market_quality_summary.json"
-    if hasattr(payload, "model_dump"):
-        data = payload.model_dump()
-    else:
-        data = payload
+    data = _serialize_payload(payload)
     summary_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return summary_path
 
@@ -58,9 +62,22 @@ def write_market_quality_summary(output_dir: Path, payload: Any) -> Path:
 def write_market_quality_by_market(output_dir: Path, payload: Any) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / "market_quality_by_market.json"
-    if hasattr(payload, "model_dump"):
-        data = payload.model_dump()
-    else:
-        data = payload
+    data = _serialize_payload(payload)
+    report_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return report_path
+
+
+def write_event_lag_summary(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "event_lag_summary.json"
+    data = _serialize_payload(payload)
+    summary_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return summary_path
+
+
+def write_event_rankings(output_dir: Path, payload: Any) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / "event_rankings.json"
+    data = _serialize_payload(payload)
     report_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return report_path
